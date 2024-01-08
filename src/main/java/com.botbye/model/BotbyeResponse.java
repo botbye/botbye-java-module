@@ -5,27 +5,27 @@ import java.util.Objects;
 import java.util.UUID;
 
 public class BotbyeResponse implements Serializable {
-    private BotbyeChallangeResult result;
+    private BotbyeChallengeResult result;
     private UUID reqId;
     private BotbyeError error;
 
     public BotbyeResponse() {
-        this.result = new BotbyeChallangeResult();
+        this.result = new BotbyeChallengeResult();
         this.reqId = UUID.fromString("00000000-0000-0000-0000-000000000000");
         this.error = null;
     }
 
-    public BotbyeResponse(BotbyeChallangeResult result, UUID reqId, BotbyeError error) {
+    public BotbyeResponse(BotbyeChallengeResult result, UUID reqId, BotbyeError error) {
         this.result = result;
         this.reqId = reqId;
         this.error = error;
     }
 
-    public BotbyeChallangeResult getResult() {
+    public BotbyeChallengeResult getResult() {
         return result;
     }
 
-    public void setResult(BotbyeChallangeResult result) {
+    public void setResult(BotbyeChallengeResult result) {
         this.result = result;
     }
 
