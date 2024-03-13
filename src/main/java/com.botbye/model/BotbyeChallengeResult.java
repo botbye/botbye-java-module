@@ -6,54 +6,41 @@ import java.io.Serializable;
 import java.util.Objects;
 
 public class BotbyeChallengeResult implements Serializable {
-    @JsonProperty("isBot")
-    private boolean isBot;
-    private boolean banRequired;
+    @JsonProperty("isAllowed")
+    private boolean isAllowed;
 
     public BotbyeChallengeResult() {
-        this.isBot = false;
-        this.banRequired = false;
+        this.isAllowed = true;
     }
 
-    public BotbyeChallengeResult(boolean isBot, boolean banRequired) {
-        this.isBot = isBot;
-        this.banRequired = banRequired;
+    public BotbyeChallengeResult(boolean isAllowed) {
+        this.isAllowed = isAllowed;
     }
 
-    public boolean isBot() {
-        return isBot;
+    public boolean isAllowed() {
+        return isAllowed;
     }
 
-    public void setBot(boolean isBot) {
-        this.isBot = isBot;
-    }
-
-    public boolean isBanRequired() {
-        return banRequired;
-    }
-
-    public void setBanRequired(boolean banRequired) {
-        this.banRequired = banRequired;
+    public void setAllowed(boolean isAllowed) {
+        this.isAllowed = isAllowed;
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        BotbyeChallengeResult that = (BotbyeChallengeResult) o;
-        return isBot == that.isBot && banRequired == that.banRequired;
+        if (!(o instanceof BotbyeChallengeResult that)) return false;
+        return isAllowed == that.isAllowed;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(isBot, banRequired);
+        return Objects.hash(isAllowed);
     }
 
     @Override
     public String toString() {
-        return "BotbyeChallangeResult{" +
-                "isBot=" + isBot +
-                ", banRequired=" + banRequired +
+        return "BotbyeChallengeResult{" +
+                "isAllowed=" + isAllowed +
                 '}';
     }
 }
