@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Objects;
 
 public class BotbyeRequest implements Serializable {
-    private String token;
     @JsonProperty("server_key")
     private String serverKey;
     private Headers headers;
@@ -19,20 +18,11 @@ public class BotbyeRequest implements Serializable {
     public BotbyeRequest() {
     }
 
-    public BotbyeRequest(String token, String serverKey, Headers headers, ConnectionDetails requestInfo, List<String> customFields) {
-        this.token = token;
+    public BotbyeRequest(String serverKey, Headers headers, ConnectionDetails requestInfo, List<String> customFields) {
         this.serverKey = serverKey;
         this.headers = headers;
         this.requestInfo = requestInfo;
         this.customFields = customFields;
-    }
-
-    public String getToken() {
-        return token;
-    }
-
-    public void setToken(String token) {
-        this.token = token;
     }
 
     public String getServerKey() {
@@ -70,10 +60,8 @@ public class BotbyeRequest implements Serializable {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        BotbyeRequest that = (BotbyeRequest) o;
-        return Objects.equals(token, that.token)
-                && Objects.equals(serverKey, that.serverKey)
+        if (!(o instanceof BotbyeRequest that)) return false;
+        return Objects.equals(serverKey, that.serverKey)
                 && Objects.equals(headers, that.headers)
                 && Objects.equals(requestInfo, that.requestInfo)
                 && Objects.equals(customFields, that.customFields);
@@ -81,14 +69,13 @@ public class BotbyeRequest implements Serializable {
 
     @Override
     public int hashCode() {
-        return Objects.hash(token, serverKey, headers, requestInfo, customFields);
+        return Objects.hash(serverKey, headers, requestInfo, customFields);
     }
 
     @Override
     public String toString() {
         return "BotbyeRequest{" +
-                "token='" + token + '\'' +
-                ", serverKey='" + serverKey + '\'' +
+                "serverKey='" + serverKey + '\'' +
                 ", headers=" + headers +
                 ", requestInfo=" + requestInfo +
                 ", customFields=" + customFields +

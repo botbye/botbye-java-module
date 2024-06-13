@@ -6,7 +6,6 @@ import java.io.Serializable;
 import java.util.Objects;
 
 public class BotbyeChallengeResult implements Serializable {
-    @JsonProperty("isAllowed")
     private boolean isAllowed;
 
     public BotbyeChallengeResult() {
@@ -17,6 +16,7 @@ public class BotbyeChallengeResult implements Serializable {
         this.isAllowed = isAllowed;
     }
 
+    @JsonProperty("isAllowed")
     public boolean isAllowed() {
         return isAllowed;
     }

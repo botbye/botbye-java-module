@@ -15,6 +15,12 @@ public class BotbyeResponse implements Serializable {
         this.error = null;
     }
 
+    public BotbyeResponse(BotbyeError error) {
+        this.result = new BotbyeChallengeResult();
+        this.reqId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+        this.error = error;
+    }
+
     public BotbyeResponse(BotbyeChallengeResult result, UUID reqId, BotbyeError error) {
         this.result = result;
         this.reqId = reqId;

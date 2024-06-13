@@ -22,8 +22,8 @@ public class BotbyeConfig implements Serializable {
     public BotbyeConfig() {
         this.botbyeEndpoint = "https://api.botbye.com";
         this.serverKey = "";
-        this.path = "/validate-request/v1";
-        this.connectionTimeout = 5L;
+        this.path = "/validate-request/v2";
+        this.connectionTimeout = 1L;
         this.connectionTimeoutUnit = TimeUnit.SECONDS;
         this.connectionPoolSize = 5;
         this.keepAliveDuration = 5L;
@@ -34,7 +34,7 @@ public class BotbyeConfig implements Serializable {
     public static class Builder {
         private String botbyeEndpoint = "https://api.botbye.com";
         private String serverKey = "";
-        private String path  = "/validate-request/v1";
+        private String path  = "/validate-request/v2";
         private long connectionTimeout = 5L;
         private TimeUnit connectionTimeoutUnit = TimeUnit.SECONDS;
         private int connectionPoolSize = 5;

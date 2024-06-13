@@ -1,6 +1,7 @@
 package com.botbye;
 
 import com.botbye.model.BotbyeConfig;
+import com.botbye.model.BotbyeError;
 import com.botbye.model.BotbyeRequest;
 import com.botbye.model.BotbyeResponse;
 import com.botbye.model.ConnectionDetails;
@@ -66,15 +67,15 @@ public class Botbye {
     public BotbyeResponse validateRequest(String token, ConnectionDetails connectionDetails, Headers headers, List<String> customFields) {
         validateServerKey();
 
-        BotbyeRequest body = createBotbyeRequestBody(token, headers, connectionDetails, customFields);
+        BotbyeRequest body = createBotbyeRequestBody(headers, connectionDetails, customFields);
 
         try {
-            Request request = createRequest(body);
+            Request request = createRequest(token, body);
             Response response = client.newCall(request).execute();
             return handleResponse(response);
         } catch (IOException e) {
-            LOGGER.warning(e.getMessage());
-            return new BotbyeResponse();
+            LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
+            return new BotbyeResponse(new BotbyeError(e.getMessage()));
         }
     }
 
@@ -84,11 +85,11 @@ public class Botbye {
 
     public CompletableFuture<BotbyeResponse> validateRequestAsync(String token, ConnectionDetails connectionDetails, Headers headers, List<String> customFields) {
         validateServerKey();
-        BotbyeRequest body = createBotbyeRequestBody(token, headers, connectionDetails, customFields);
+        BotbyeRequest body = createBotbyeRequestBody(headers, connectionDetails, customFields);
 
         CompletableFuture<BotbyeResponse> future = new CompletableFuture<>();
         try {
-            Request request = createRequest(body);
+            Request request = createRequest(token, body);
             client.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onResponse(@NotNull Call call, @NotNull Response response) {
@@ -97,14 +98,14 @@ public class Botbye {
 
                 @Override
                 public void onFailure(@NotNull Call call, @NotNull IOException e) {
-                    LOGGER.warning(e.getMessage());
-                    future.complete(new BotbyeResponse());
+                    LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
+                    future.complete(new BotbyeResponse(new BotbyeError(e.getMessage())));
                 }
             });
             return future;
         } catch (IOException e) {
-            LOGGER.warning(e.getMessage());
-            future.complete(new BotbyeResponse());
+            LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
+            future.complete(new BotbyeResponse(new BotbyeError(e.getMessage())));
             return future;
         }
     }
@@ -122,23 +123,28 @@ public class Botbye {
             }
             return reader.readValue(body.string(), BotbyeResponse.class);
         } catch (IOException e) {
-            LOGGER.warning(e.getMessage());
-            return new BotbyeResponse();
+            LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
+            return new BotbyeResponse(new BotbyeError(e.getMessage()));
         }
     }
 
-    private BotbyeRequest createBotbyeRequestBody(String token, Headers headers, ConnectionDetails connectionDetails, List<String> customFields) {
-        return new BotbyeRequest(token, botbyeConfig.getServerKey(), headers, connectionDetails, customFields);
+    private BotbyeRequest createBotbyeRequestBody(Headers headers, ConnectionDetails connectionDetails, List<String> customFields) {
+        return new BotbyeRequest(botbyeConfig.getServerKey(), headers, connectionDetails, customFields);
     }
 
-    private Request createRequest(BotbyeRequest body) throws JsonProcessingException {
-        String url = String.format("%s%s", botbyeConfig.getBotbyeEndpoint(), botbyeConfig.getPath());
+    private Request createRequest(String token, BotbyeRequest body) throws JsonProcessingException {
+        String url = new StringBuilder()
+                .append(botbyeConfig.getBotbyeEndpoint())
+                .append(botbyeConfig.getPath())
+                .append("?")
+                .append(token)
+                .toString();
 
         return new Request.Builder()
                 .url(url)
                 .post(RequestBody.create(writer.writeValueAsString(body), botbyeConfig.getContentType()))
-                .addHeader("Module-Name", BotbyeConfig.moduleName)
-                .addHeader("Module-Version", BotbyeConfig.moduleVersion)
+                .header("Module-Name", BotbyeConfig.moduleName)
+                .header("Module-Version", BotbyeConfig.moduleVersion)
                 .build();
     }
 }
