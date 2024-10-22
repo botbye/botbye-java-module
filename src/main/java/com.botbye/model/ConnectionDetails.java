@@ -7,14 +7,8 @@ import java.util.Date;
 import java.util.Objects;
 
 public class ConnectionDetails implements Serializable {
-    @JsonProperty("created_at")
-    private Date createdAt;
-    @JsonProperty("server_port")
-    private int serverPort;
     @JsonProperty("remote_addr")
     private String remoteAddr;
-    @JsonProperty("server_name")
-    private String serverName;
     @JsonProperty("request_method")
     private String requestMethod;
     @JsonProperty("request_uri")
@@ -23,29 +17,10 @@ public class ConnectionDetails implements Serializable {
     public ConnectionDetails() {
     }
 
-    public ConnectionDetails(int serverPort, String remoteAddr, String serverName, String requestMethod, String requestUri) {
-        this.createdAt = new Date();
-        this.serverPort = serverPort;
+    public ConnectionDetails(String remoteAddr, String requestMethod, String requestUri) {
         this.remoteAddr = remoteAddr;
-        this.serverName = serverName;
         this.requestMethod = requestMethod;
         this.requestUri = requestUri;
-    }
-
-    public Date getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Date createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public int getServerPort() {
-        return serverPort;
-    }
-
-    public void setServerPort(int serverPort) {
-        this.serverPort = serverPort;
     }
 
     public String getRemoteAddr() {
@@ -54,14 +29,6 @@ public class ConnectionDetails implements Serializable {
 
     public void setRemoteAddr(String remoteAddr) {
         this.remoteAddr = remoteAddr;
-    }
-
-    public String getServerName() {
-        return serverName;
-    }
-
-    public void setServerName(String serverName) {
-        this.serverName = serverName;
     }
 
     public String getRequestMethod() {
@@ -83,28 +50,19 @@ public class ConnectionDetails implements Serializable {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ConnectionDetails that = (ConnectionDetails) o;
-        return serverPort == that.serverPort
-                && Objects.equals(createdAt, that.createdAt)
-                && Objects.equals(remoteAddr, that.remoteAddr)
-                && Objects.equals(serverName, that.serverName)
-                && Objects.equals(requestMethod, that.requestMethod)
-                && Objects.equals(requestUri, that.requestUri);
+        if (!(o instanceof ConnectionDetails that)) return false;
+        return Objects.equals(remoteAddr, that.remoteAddr) && Objects.equals(requestMethod, that.requestMethod) && Objects.equals(requestUri, that.requestUri);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(createdAt, serverPort, remoteAddr, serverName, requestMethod, requestUri);
+        return Objects.hash(remoteAddr, requestMethod, requestUri);
     }
 
     @Override
     public String toString() {
         return "ConnectionDetails{" +
-                "createdAt=" + createdAt +
-                ", serverPort=" + serverPort +
-                ", remoteAddr='" + remoteAddr + '\'' +
-                ", serverName='" + serverName + '\'' +
+                "remoteAddr='" + remoteAddr + '\'' +
                 ", requestMethod='" + requestMethod + '\'' +
                 ", requestUri='" + requestUri + '\'' +
                 '}';

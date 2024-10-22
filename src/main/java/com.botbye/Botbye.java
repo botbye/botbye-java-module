@@ -23,7 +23,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
@@ -31,9 +31,15 @@ import java.util.logging.Logger;
 
 public class Botbye {
     private static final Logger LOGGER = Logger.getLogger(Botbye.class.getName());
-    private BotbyeConfig botbyeConfig = new BotbyeConfig();
+
+    static {
+        LOGGER.setLevel(Level.WARNING);
+        LOGGER.addHandler(new ConsoleHandler());
+    }
+
     private final ObjectReader reader = new ObjectMapper().reader();
     private final ObjectWriter writer = new ObjectMapper().registerModule(new SimpleModule().addSerializer(Headers.class, new HeadersSerializer())).writer();
+    private BotbyeConfig botbyeConfig = new BotbyeConfig();
     @SuppressWarnings("KotlinInternalInJava")
     private final OkHttpClient client = new OkHttpClient().newBuilder()
             .connectionPool(new ConnectionPool(
@@ -43,11 +49,6 @@ public class Botbye {
             )
             .connectTimeout(botbyeConfig.getConnectionTimeout(), botbyeConfig.getConnectionTimeoutUnit())
             .build();
-
-    static {
-        LOGGER.setLevel(Level.WARNING);
-        LOGGER.addHandler(new ConsoleHandler());
-    }
 
     public Botbye() {
     }
@@ -61,10 +62,10 @@ public class Botbye {
     }
 
     public BotbyeResponse validateRequest(String token, ConnectionDetails connectionDetails, Headers headers) {
-        return validateRequest(token, connectionDetails, headers, Collections.emptyList());
+        return validateRequest(token, connectionDetails, headers, Collections.emptyMap());
     }
 
-    public BotbyeResponse validateRequest(String token, ConnectionDetails connectionDetails, Headers headers, List<String> customFields) {
+    public BotbyeResponse validateRequest(String token, ConnectionDetails connectionDetails, Headers headers, Map<String, String> customFields) {
         validateServerKey();
 
         BotbyeRequest body = createBotbyeRequestBody(headers, connectionDetails, customFields);
@@ -80,10 +81,10 @@ public class Botbye {
     }
 
     public CompletableFuture<BotbyeResponse> validateRequestAsync(String token, ConnectionDetails connectionDetails, Headers headers) {
-        return validateRequestAsync(token, connectionDetails, headers, Collections.emptyList());
+        return validateRequestAsync(token, connectionDetails, headers, Collections.emptyMap());
     }
 
-    public CompletableFuture<BotbyeResponse> validateRequestAsync(String token, ConnectionDetails connectionDetails, Headers headers, List<String> customFields) {
+    public CompletableFuture<BotbyeResponse> validateRequestAsync(String token, ConnectionDetails connectionDetails, Headers headers, Map<String, String> customFields) {
         validateServerKey();
         BotbyeRequest body = createBotbyeRequestBody(headers, connectionDetails, customFields);
 
@@ -128,17 +129,15 @@ public class Botbye {
         }
     }
 
-    private BotbyeRequest createBotbyeRequestBody(Headers headers, ConnectionDetails connectionDetails, List<String> customFields) {
+    private BotbyeRequest createBotbyeRequestBody(Headers headers, ConnectionDetails connectionDetails, Map<String, String> customFields) {
         return new BotbyeRequest(botbyeConfig.getServerKey(), headers, connectionDetails, customFields);
     }
 
     private Request createRequest(String token, BotbyeRequest body) throws JsonProcessingException {
-        String url = new StringBuilder()
-                .append(botbyeConfig.getBotbyeEndpoint())
-                .append(botbyeConfig.getPath())
-                .append("?")
-                .append(token)
-                .toString();
+        String url = botbyeConfig.getBotbyeEndpoint() +
+                botbyeConfig.getPath() +
+                "?" +
+                token;
 
         return new Request.Builder()
                 .url(url)

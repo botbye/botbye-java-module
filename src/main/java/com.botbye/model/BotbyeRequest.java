@@ -3,7 +3,7 @@ package com.botbye.model;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.io.Serializable;
-import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public class BotbyeRequest implements Serializable {
@@ -13,12 +13,12 @@ public class BotbyeRequest implements Serializable {
     @JsonProperty("request_info")
     private ConnectionDetails requestInfo;
     @JsonProperty("custom_fields")
-    private List<String> customFields;
+    private Map<String, String> customFields;
 
     public BotbyeRequest() {
     }
 
-    public BotbyeRequest(String serverKey, Headers headers, ConnectionDetails requestInfo, List<String> customFields) {
+    public BotbyeRequest(String serverKey, Headers headers, ConnectionDetails requestInfo, Map<String, String> customFields) {
         this.serverKey = serverKey;
         this.headers = headers;
         this.requestInfo = requestInfo;
@@ -49,11 +49,11 @@ public class BotbyeRequest implements Serializable {
         this.requestInfo = requestInfo;
     }
 
-    public List<String> getCustomFields() {
+    public Map<String, String> getCustomFields() {
         return customFields;
     }
 
-    public void setCustomFields(List<String> customFields) {
+    public void setCustomFields(Map<String, String> customFields) {
         this.customFields = customFields;
     }
 
