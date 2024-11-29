@@ -20,7 +20,7 @@ public class BotbyeConfig implements Serializable {
     private MediaType contentType;
 
     public BotbyeConfig() {
-        this.botbyeEndpoint = "https://api.botbye.com";
+        this.botbyeEndpoint = "https://verify.botbye.com";
         this.serverKey = "";
         this.path = "/validate-request/v2";
         this.connectionTimeout = 1L;
@@ -32,7 +32,7 @@ public class BotbyeConfig implements Serializable {
     }
 
     public static class Builder {
-        private String botbyeEndpoint = "https://api.botbye.com";
+        private String botbyeEndpoint = "https://verify.botbye.com";
         private String serverKey = "";
         private String path  = "/validate-request/v2";
         private long connectionTimeout = 5L;
