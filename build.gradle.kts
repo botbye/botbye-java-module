@@ -1,5 +1,6 @@
 plugins {
     `maven-publish`
+    id("java-library")
     signing
     id("java")
     id("io.codearte.nexus-staging") version "0.30.0"
@@ -13,8 +14,8 @@ repositories {
 }
 
 dependencies {
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.15.3")
+    api("com.squareup.okhttp3:okhttp:4.12.0")
+    api("com.fasterxml.jackson.core:jackson-databind:2.15.3")
 }
 
 tasks {
