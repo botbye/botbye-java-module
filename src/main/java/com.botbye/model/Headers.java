@@ -5,24 +5,23 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 public class Headers implements Serializable {
-    private Set<Map.Entry<String, List<String>>> entries;
+    private Map<String, List<String>> entries;
 
     public Headers() {
-        this.entries = Collections.emptySet();
+        this.entries = Collections.emptyMap();
     }
 
-    public Headers(Set<Map.Entry<String, List<String>>> entries) {
+    public Headers(Map<String, List<String>> entries) {
         this.entries = entries;
     }
 
-    public Set<Map.Entry<String, List<String>>> getEntries() {
+    public Map<String, List<String>> getEntries() {
         return entries;
     }
 
-    public void setEntries(Set<Map.Entry<String, List<String>>> entries) {
+    public void setEntries(Map<String, List<String>> entries) {
         this.entries = entries;
     }
 

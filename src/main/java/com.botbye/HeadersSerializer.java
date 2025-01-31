@@ -19,6 +19,7 @@ public class HeadersSerializer extends JsonSerializer<Headers> {
             SerializerProvider serializers
     ) throws IOException {
         Map<String, String> result = value.getEntries()
+                .entrySet()
                 .stream()
                 .collect(
                         Collectors.toMap(

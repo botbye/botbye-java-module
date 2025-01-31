@@ -24,6 +24,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
@@ -137,7 +138,7 @@ public class Botbye {
         String url = botbyeConfig.getBotbyeEndpoint() +
                 botbyeConfig.getPath() +
                 "?" +
-                token;
+                Optional.ofNullable(token).orElse("");
 
         return new Request.Builder()
                 .url(url)
