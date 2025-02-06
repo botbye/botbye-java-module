@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.ConnectionPool;
+import okhttp3.Dispatcher;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
@@ -41,14 +42,19 @@ public class Botbye {
     private final ObjectReader reader = new ObjectMapper().reader();
     private final ObjectWriter writer = new ObjectMapper().registerModule(new SimpleModule().addSerializer(Headers.class, new HeadersSerializer())).writer();
     private BotbyeConfig botbyeConfig = new BotbyeConfig();
+    private final Dispatcher dispatcher = new Dispatcher();
     @SuppressWarnings("KotlinInternalInJava")
     private final OkHttpClient client = new OkHttpClient().newBuilder()
+            .dispatcher(dispatcher)
             .connectionPool(new ConnectionPool(
-                    botbyeConfig.getConnectionPoolSize(),
+                    botbyeConfig.getMaxIdleConnections(),
                     botbyeConfig.getKeepAliveDuration(),
                     botbyeConfig.getKeepAliveDurationTimeUnit())
             )
-            .connectTimeout(botbyeConfig.getConnectionTimeout(), botbyeConfig.getConnectionTimeoutUnit())
+            .readTimeout(botbyeConfig.getReadTimeout())
+            .callTimeout(botbyeConfig.getCallTimeout())
+            .connectTimeout(botbyeConfig.getConnectionTimeout())
+            .writeTimeout(botbyeConfig.getWriteTimeout())
             .build();
 
     public Botbye() {
@@ -56,10 +62,14 @@ public class Botbye {
 
     public Botbye(BotbyeConfig config) {
         botbyeConfig = config;
+        dispatcher.setMaxRequests(botbyeConfig.getMaxRequests());
+        dispatcher.setMaxRequestsPerHost(botbyeConfig.getMaxRequestsPerHost());
     }
 
     public void setConf(BotbyeConfig config) {
         botbyeConfig = config;
+        dispatcher.setMaxRequests(botbyeConfig.getMaxRequests());
+        dispatcher.setMaxRequestsPerHost(botbyeConfig.getMaxRequestsPerHost());
     }
 
     public BotbyeResponse validateRequest(String token, ConnectionDetails connectionDetails, Headers headers) {

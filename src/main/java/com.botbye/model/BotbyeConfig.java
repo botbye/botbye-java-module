@@ -3,6 +3,7 @@ package com.botbye.model;
 import okhttp3.MediaType;
 
 import java.io.Serializable;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -12,34 +13,50 @@ public class BotbyeConfig implements Serializable {
     private String botbyeEndpoint;
     private String serverKey;
     private String path;
-    private long connectionTimeout;
-    private TimeUnit connectionTimeoutUnit;
-    private int connectionPoolSize;
+    private MediaType contentType;
+    // client config
+    private Duration readTimeout;
+    private Duration writeTimeout;
+    private Duration connectionTimeout;
+    private Duration callTimeout;
+    // pool config
+    private int maxIdleConnections;
     private long keepAliveDuration;
     private TimeUnit keepAliveDurationTimeUnit;
-    private MediaType contentType;
+    // dispatcher
+    private int maxRequestsPerHost;
+    private int maxRequests;
+
 
     public BotbyeConfig() {
         this.botbyeEndpoint = "https://verify.botbye.com";
         this.serverKey = "";
         this.path = "/validate-request/v2";
-        this.connectionTimeout = 1L;
-        this.connectionTimeoutUnit = TimeUnit.SECONDS;
-        this.connectionPoolSize = 5;
+        this.readTimeout = Duration.ofSeconds(2);
+        this.writeTimeout = Duration.ofSeconds(2);
+        this.connectionTimeout = Duration.ofSeconds(2);
+        this.callTimeout = Duration.ofSeconds(5);
+        this.maxIdleConnections = 250;
         this.keepAliveDuration = 5L;
         this.keepAliveDurationTimeUnit = TimeUnit.MINUTES;
+        this.maxRequestsPerHost = 1500;
+        this.maxRequests = 1500;
         this.contentType = MediaType.parse("application/json");
     }
 
     public static class Builder {
         private String botbyeEndpoint = "https://verify.botbye.com";
         private String serverKey = "";
-        private String path  = "/validate-request/v2";
-        private long connectionTimeout = 5L;
-        private TimeUnit connectionTimeoutUnit = TimeUnit.SECONDS;
-        private int connectionPoolSize = 5;
+        private String path = "/validate-request/v2";
+        private Duration readTimeout = Duration.ofSeconds(2);
+        private Duration writeTimeout = Duration.ofSeconds(2);
+        private Duration connectionTimeout = Duration.ofSeconds(2);
+        private Duration callTimeout = Duration.ofSeconds(5);
+        private int maxIdleConnections = 250;
         private long keepAliveDuration = 5L;
         private TimeUnit keepAliveDurationTimeUnit = TimeUnit.MINUTES;
+        private int maxRequestsPerHost = 1500;
+        private int maxRequests = 1500;
         private MediaType contentType = MediaType.parse("application/json");
 
         public Builder botbyeEndpoint(String botbyeEndpoint) {
@@ -57,20 +74,44 @@ public class BotbyeConfig implements Serializable {
             return this;
         }
 
-        public Builder connectionTimeout(long connectionTimeout, TimeUnit unit) {
-            this.connectionTimeout = connectionTimeout;
-            this.connectionTimeoutUnit = unit;
+        public Builder readTimeout(Duration readTimeout) {
+            this.readTimeout = readTimeout;
             return this;
         }
 
-        public Builder connectionPoolSize(int connectionPoolSize) {
-            this.connectionPoolSize = connectionPoolSize;
+        public Builder writeTimeout(Duration writeTimeout) {
+            this.writeTimeout = writeTimeout;
+            return this;
+        }
+
+        public Builder connectionTimeout(Duration connectionTimeout) {
+            this.connectionTimeout = connectionTimeout;
+            return this;
+        }
+
+        public Builder callTimeout(Duration callTimeout) {
+            this.callTimeout = callTimeout;
+            return this;
+        }
+
+        public Builder maxIdleConnections(int maxIdleConnections) {
+            this.maxIdleConnections = maxIdleConnections;
             return this;
         }
 
         public Builder keepAliveDuration(long keepAliveDuration, TimeUnit unit) {
             this.keepAliveDuration = keepAliveDuration;
             this.keepAliveDurationTimeUnit = unit;
+            return this;
+        }
+
+        public Builder maxRequestsPerHost(int maxRequestsPerHost) {
+            this.maxRequestsPerHost = maxRequestsPerHost;
+            return this;
+        }
+
+        public Builder maxRequests(int maxRequests) {
+            this.maxRequests = maxRequests;
             return this;
         }
 
@@ -84,11 +125,15 @@ public class BotbyeConfig implements Serializable {
             config.botbyeEndpoint = this.botbyeEndpoint;
             config.serverKey = this.serverKey;
             config.path = this.path;
+            config.readTimeout = this.readTimeout;
+            config.writeTimeout = this.writeTimeout;
             config.connectionTimeout = this.connectionTimeout;
-            config.connectionTimeoutUnit = this.connectionTimeoutUnit;
-            config.connectionPoolSize = this.connectionPoolSize;
+            config.callTimeout = this.callTimeout;
+            config.maxIdleConnections = this.maxIdleConnections;
             config.keepAliveDuration = this.keepAliveDuration;
             config.keepAliveDurationTimeUnit = this.keepAliveDurationTimeUnit;
+            config.maxRequestsPerHost = this.maxRequestsPerHost;
+            config.maxRequests = this.maxRequests;
             config.contentType = this.contentType;
             return config;
         }
@@ -106,16 +151,28 @@ public class BotbyeConfig implements Serializable {
         return path;
     }
 
-    public long getConnectionTimeout() {
+    public MediaType getContentType() {
+        return contentType;
+    }
+
+    public Duration getReadTimeout() {
+        return readTimeout;
+    }
+
+    public Duration getWriteTimeout() {
+        return writeTimeout;
+    }
+
+    public Duration getConnectionTimeout() {
         return connectionTimeout;
     }
 
-    public TimeUnit getConnectionTimeoutUnit() {
-        return connectionTimeoutUnit;
+    public Duration getCallTimeout() {
+        return callTimeout;
     }
 
-    public int getConnectionPoolSize() {
-        return connectionPoolSize;
+    public int getMaxIdleConnections() {
+        return maxIdleConnections;
     }
 
     public long getKeepAliveDuration() {
@@ -126,39 +183,23 @@ public class BotbyeConfig implements Serializable {
         return keepAliveDurationTimeUnit;
     }
 
-    public MediaType getContentType() {
-        return contentType;
+    public int getMaxRequestsPerHost() {
+        return maxRequestsPerHost;
+    }
+
+    public int getMaxRequests() {
+        return maxRequests;
     }
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        BotbyeConfig config = (BotbyeConfig) o;
-        return connectionTimeout == config.connectionTimeout
-                && connectionPoolSize == config.connectionPoolSize
-                && keepAliveDuration == config.keepAliveDuration
-                && Objects.equals(botbyeEndpoint, config.botbyeEndpoint)
-                && Objects.equals(serverKey, config.serverKey)
-                && Objects.equals(path, config.path)
-                && connectionTimeoutUnit == config.connectionTimeoutUnit
-                && keepAliveDurationTimeUnit == config.keepAliveDurationTimeUnit
-                && Objects.equals(contentType, config.contentType);
+        if (!(o instanceof BotbyeConfig that)) return false;
+        return maxIdleConnections == that.maxIdleConnections && keepAliveDuration == that.keepAliveDuration && maxRequestsPerHost == that.maxRequestsPerHost && maxRequests == that.maxRequests && Objects.equals(botbyeEndpoint, that.botbyeEndpoint) && Objects.equals(serverKey, that.serverKey) && Objects.equals(path, that.path) && Objects.equals(contentType, that.contentType) && Objects.equals(readTimeout, that.readTimeout) && Objects.equals(writeTimeout, that.writeTimeout) && Objects.equals(connectionTimeout, that.connectionTimeout) && Objects.equals(callTimeout, that.callTimeout) && keepAliveDurationTimeUnit == that.keepAliveDurationTimeUnit;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(
-                botbyeEndpoint,
-                serverKey,
-                path,
-                connectionTimeout,
-                connectionTimeoutUnit,
-                connectionPoolSize,
-                keepAliveDuration,
-                keepAliveDurationTimeUnit,
-                contentType
-        );
+        return Objects.hash(botbyeEndpoint, serverKey, path, contentType, readTimeout, writeTimeout, connectionTimeout, callTimeout, maxIdleConnections, keepAliveDuration, keepAliveDurationTimeUnit, maxRequestsPerHost, maxRequests);
     }
 
     @Override
@@ -167,12 +208,16 @@ public class BotbyeConfig implements Serializable {
                 "botbyeEndpoint='" + botbyeEndpoint + '\'' +
                 ", serverKey='" + serverKey + '\'' +
                 ", path='" + path + '\'' +
+                ", contentType=" + contentType +
+                ", readTimeout=" + readTimeout +
+                ", writeTimeout=" + writeTimeout +
                 ", connectionTimeout=" + connectionTimeout +
-                ", connectionTimeoutUnit=" + connectionTimeoutUnit +
-                ", connectionPoolSize=" + connectionPoolSize +
+                ", callTimeout=" + callTimeout +
+                ", maxIdleConnections=" + maxIdleConnections +
                 ", keepAliveDuration=" + keepAliveDuration +
                 ", keepAliveDurationTimeUnit=" + keepAliveDurationTimeUnit +
-                ", contentType=" + contentType +
+                ", maxRequestsPerHost=" + maxRequestsPerHost +
+                ", maxRequests=" + maxRequests +
                 '}';
     }
 }
