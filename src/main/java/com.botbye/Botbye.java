@@ -45,6 +45,7 @@ public class Botbye {
     private final Dispatcher dispatcher = new Dispatcher();
     @SuppressWarnings("KotlinInternalInJava")
     private final OkHttpClient client = new OkHttpClient().newBuilder()
+            .retryOnConnectionFailure(false)
             .dispatcher(dispatcher)
             .connectionPool(new ConnectionPool(
                     botbyeConfig.getMaxIdleConnections(),
