@@ -154,8 +154,8 @@ public class Botbye {
         return new Request.Builder()
                 .url(url)
                 .post(RequestBody.create(writer.writeValueAsString(body), botbyeConfig.getContentType()))
-                .header("Module-Name", BotbyeConfig.moduleName)
-                .header("Module-Version", BotbyeConfig.moduleVersion)
+                .header("Module-Name", BotbyeConfig.getModuleName())
+                .header("Module-Version", BotbyeConfig.getModuleVersion())
                 .build();
     }
 }

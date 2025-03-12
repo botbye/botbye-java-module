@@ -8,8 +8,8 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 public class BotbyeConfig implements Serializable {
-    public static final String moduleVersion = "0.0.1";
-    public static final String moduleName = "Java";
+    private static final String MODULE_VERSION = "0.0.1";
+    private static final String MODULE_NAME = "Java";
     private String botbyeEndpoint;
     private String serverKey;
     private String path;
@@ -137,6 +137,14 @@ public class BotbyeConfig implements Serializable {
             config.contentType = this.contentType;
             return config;
         }
+    }
+
+    public static String getModuleName() {
+        return MODULE_NAME;
+    }
+
+    public static String getModuleVersion() {
+        return MODULE_VERSION;
     }
 
     public String getBotbyeEndpoint() {
