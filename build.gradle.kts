@@ -30,10 +30,11 @@ publishing {
         create<MavenPublication>("mavenJava") {
             artifactId = "java-module"
             from(components["java"])
+
             pom {
                 packaging = "jar"
                 name.set("BotBye Java module")
-                url.set("https://github.com/botbye/botbye-java-module")
+                url.set("https://github.com/botbye/${project.rootProject.name}")
                 description.set("Java module for integration with botbye.com")
 
                 licenses {
@@ -44,9 +45,9 @@ publishing {
                 }
 
                 scm {
-                    connection.set("scm:https://github.com/botbye/botbye-java-module.git")
-                    developerConnection.set("scm:git@github.com:botbye/botbye-java-module.git")
-                    url.set("https://botbye.com/")
+                    connection.set("scm:https://github.com/botbye/${project.rootProject.name}.git")
+                    developerConnection.set("scm:git@github.com:botbye/${project.rootProject.name}.git")
+                    url.set("https://github.com/botbye/${project.rootProject.name}")
                 }
 
                 developers {
@@ -69,8 +70,8 @@ publishing {
 jreleaser {
     release {
         github {
-            skipRelease = true
-            skipTag = true
+            name = "botbye-java-module"
+            token = "env:GITHUB_TOKEN"
         }
     }
 
