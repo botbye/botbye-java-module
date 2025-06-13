@@ -1,37 +1,29 @@
+import java.time.LocalDate
+import org.jreleaser.model.Active
+
 plugins {
     `maven-publish`
     id("java-library")
     signing
     id("java")
-    id("io.codearte.nexus-staging") version "0.30.0"
+    id("org.jreleaser") version "1.18.0"
 }
 
 group = "com.botbye"
-version = "0.0.1-SNAPSHOT"
+version = "0.0.1"
 
 repositories {
     mavenCentral()
 }
 
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
 dependencies {
     api("com.squareup.okhttp3:okhttp:4.12.0")
     api("com.fasterxml.jackson.core:jackson-databind:2.15.3")
-}
-
-tasks {
-    register<Javadoc>("withJavadoc")
-
-    register<Jar>("withJavadocJar") {
-        archiveClassifier.set("javadoc")
-        dependsOn(named("withJavadoc"))
-        val destination = named<Javadoc>("withJavadoc").get().destinationDir
-        from(destination)
-    }
-
-    register<Jar>("withSourcesJar") {
-        archiveClassifier.set("sources")
-        from(project.sourceSets.getByName("main").java.srcDirs)
-    }
 }
 
 publishing {
@@ -70,23 +62,44 @@ publishing {
     }
     repositories {
         maven {
-            val releasesUrl = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
-            val snapshotsUrl = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
-            url = if (project.version.toString().endsWith("SNAPSHOT")) snapshotsUrl else releasesUrl
-            credentials {
-                username = project.properties["ossrhUsername"].toString()
-                password = project.properties["ossrhPassword"].toString()
+            setUrl(layout.buildDirectory.dir("staging-deploy"))
+        }
+    }
+}
+
+jreleaser {
+    release {
+        github {
+            skipRelease = true
+            skipTag = true
+        }
+    }
+
+    signing {
+        active = Active.ALWAYS
+        armored = true
+        verify = true
+    }
+
+    project {
+        inceptionYear = "${LocalDate.now().year}"
+        author("@botbye")
+    }
+
+    deploy {
+        maven {
+            mavenCentral.create("sonatype") {
+                active = Active.ALWAYS
+                url = "https://central.sonatype.com/api/v1/publisher"
+                stagingRepository(layout.buildDirectory.dir("staging-deploy").get().toString())
+                setAuthorization("Basic")
+                retryDelay = 60
+                sign = true
+                checksums = true
+                sourceJar = true
+                javadocJar = true
             }
         }
     }
 }
 
-signing {
-    sign(publishing.publications["mavenJava"])
-}
-
-nexusStaging {
-    serverUrl = "https://s01.oss.sonatype.org/service/local/"
-    username = project.properties["ossrhUsername"].toString()
-    password = project.properties["ossrhPassword"].toString()
-}
