@@ -1,4 +1,3 @@
-import java.time.LocalDate
 import org.jreleaser.model.Active
 
 plugins {
@@ -54,7 +53,7 @@ publishing {
                     developer {
                         id.set("BotBye")
                         name.set("BotBye")
-                        email.set("https://botbye.com/")
+                        email.set("accounts@botbye.com")
                     }
                 }
             }
@@ -82,7 +81,7 @@ jreleaser {
     }
 
     project {
-        inceptionYear = "${LocalDate.now().year}"
+        inceptionYear = "2023"
         author("@botbye")
     }
 
