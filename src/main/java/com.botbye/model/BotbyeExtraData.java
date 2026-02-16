@@ -2,7 +2,6 @@ package com.botbye.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
-
 import java.io.Serializable;
 import java.util.Objects;
 
@@ -33,16 +32,16 @@ public class BotbyeExtraData implements Serializable {
     }
 
     public BotbyeExtraData(
-        String ip,
-        String asn,
-        String country,
-        String browser,
-        String browserVersion,
-        String deviceName,
-        String deviceType,
-        String deviceCodeName,
-        String platform,
-        String platformVersion
+            String ip,
+            String asn,
+            String country,
+            String browser,
+            String browserVersion,
+            String deviceName,
+            String deviceType,
+            String deviceCodeName,
+            String platform,
+            String platformVersion
     ) {
         this.ip = ip;
         this.asn = asn;
@@ -159,18 +158,18 @@ public class BotbyeExtraData implements Serializable {
     @Override
     public String toString() {
         return "BotbyeExtraData{" +
-            "realIp='" + realIp + '\'' +
-            ", realCountry='" + realCountry + '\'' +
-            ", ip='" + ip + '\'' +
-            ", asn='" + asn + '\'' +
-            ", country='" + country + '\'' +
-            ", browser='" + browser + '\'' +
-            ", browserVersion='" + browserVersion + '\'' +
-            ", deviceName='" + deviceName + '\'' +
-            ", deviceType='" + deviceType + '\'' +
-            ", deviceCodeName='" + deviceCodeName + '\'' +
-            ", platform='" + platform + '\'' +
-            ", platformVersion='" + platformVersion + '\'' +
-            '}';
+                "realIp='" + realIp + '\'' +
+                ", realCountry='" + realCountry + '\'' +
+                ", ip='" + ip + '\'' +
+                ", asn='" + asn + '\'' +
+                ", country='" + country + '\'' +
+                ", browser='" + browser + '\'' +
+                ", browserVersion='" + browserVersion + '\'' +
+                ", deviceName='" + deviceName + '\'' +
+                ", deviceType='" + deviceType + '\'' +
+                ", deviceCodeName='" + deviceCodeName + '\'' +
+                ", platform='" + platform + '\'' +
+                ", platformVersion='" + platformVersion + '\'' +
+                '}';
     }
 }

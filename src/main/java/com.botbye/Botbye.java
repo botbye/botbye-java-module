@@ -6,11 +6,21 @@ import com.botbye.model.BotbyeRequest;
 import com.botbye.model.BotbyeResponse;
 import com.botbye.model.ConnectionDetails;
 import com.botbye.model.Headers;
+import com.botbye.model.InitRequest;
+import com.botbye.model.InitResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.ConnectionPool;
@@ -21,15 +31,6 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 import org.jetbrains.annotations.NotNull;
-
-import java.io.IOException;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class Botbye {
     private static final Logger LOGGER = Logger.getLogger(Botbye.class.getName());
@@ -59,12 +60,14 @@ public class Botbye {
             .build();
 
     public Botbye() {
+        initRequest();
     }
 
     public Botbye(BotbyeConfig config) {
         botbyeConfig = config;
         dispatcher.setMaxRequests(botbyeConfig.getMaxRequests());
         dispatcher.setMaxRequestsPerHost(botbyeConfig.getMaxRequestsPerHost());
+        initRequest();
     }
 
     public void setConf(BotbyeConfig config) {
@@ -120,6 +123,32 @@ public class Botbye {
             LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
             future.complete(new BotbyeResponse(new BotbyeError(e.getMessage())));
             return future;
+        }
+    }
+
+    private void initRequest() {
+        try {
+            String url = botbyeConfig.getBotbyeEndpoint().replaceAll("/+$", "") + "/init-request/v1";
+            InitRequest initBody = new InitRequest(botbyeConfig.getServerKey());
+            Request request = new Request.Builder()
+                    .url(url)
+                    .post(RequestBody.create(writer.writeValueAsString(initBody), botbyeConfig.getContentType()))
+                    .header("Module-Name", BotbyeConfig.getModuleName())
+                    .header("Module-Version", BotbyeConfig.getModuleVersion())
+                    .header("X-Botbye-Server-Key", botbyeConfig.getServerKey())
+                    .build();
+
+            Response response = client.newCall(request).execute();
+            try (ResponseBody body = response.body()) {
+                if (body != null) {
+                    InitResponse initResponse = reader.readValue(body.string(), InitResponse.class);
+                    if (initResponse.getError() != null || !"ok".equals(initResponse.getStatus())) {
+                        LOGGER.warning("[BotBye] init-request error = " + initResponse.getError() + "; status = " + initResponse.getStatus());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
         }
     }
 
