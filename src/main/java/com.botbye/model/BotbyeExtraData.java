@@ -146,7 +146,8 @@ public class BotbyeExtraData implements Serializable {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof BotbyeExtraData that)) return false;
+        if (o == null || getClass() != o.getClass()) return false;
+        BotbyeExtraData that = (BotbyeExtraData) o;
         return Objects.equals(realIp, that.realIp) && Objects.equals(realCountry, that.realCountry) && Objects.equals(ip, that.ip) && Objects.equals(asn, that.asn) && Objects.equals(country, that.country) && Objects.equals(browser, that.browser) && Objects.equals(browserVersion, that.browserVersion) && Objects.equals(deviceName, that.deviceName) && Objects.equals(deviceType, that.deviceType) && Objects.equals(deviceCodeName, that.deviceCodeName) && Objects.equals(platform, that.platform) && Objects.equals(platformVersion, that.platformVersion);
     }
 
