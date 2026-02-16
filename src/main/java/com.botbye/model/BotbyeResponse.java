@@ -70,7 +70,8 @@ public class BotbyeResponse implements Serializable {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof BotbyeResponse that)) return false;
+        if (o == null || getClass() != o.getClass()) return false;
+        BotbyeResponse that = (BotbyeResponse) o;
         return Objects.equals(result, that.result) && Objects.equals(reqId, that.reqId) && Objects.equals(error, that.error) && Objects.equals(extraData, that.extraData);
     }
 

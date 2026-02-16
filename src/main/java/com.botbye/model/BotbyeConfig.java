@@ -200,7 +200,9 @@ public class BotbyeConfig implements Serializable {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof BotbyeConfig that)) return false;
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        BotbyeConfig that = (BotbyeConfig) o;
         return maxIdleConnections == that.maxIdleConnections && keepAliveDuration == that.keepAliveDuration && maxRequestsPerHost == that.maxRequestsPerHost && maxRequests == that.maxRequests && Objects.equals(botbyeEndpoint, that.botbyeEndpoint) && Objects.equals(serverKey, that.serverKey) && Objects.equals(path, that.path) && Objects.equals(contentType, that.contentType) && Objects.equals(readTimeout, that.readTimeout) && Objects.equals(writeTimeout, that.writeTimeout) && Objects.equals(connectionTimeout, that.connectionTimeout) && Objects.equals(callTimeout, that.callTimeout) && keepAliveDurationTimeUnit == that.keepAliveDurationTimeUnit;
     }
 

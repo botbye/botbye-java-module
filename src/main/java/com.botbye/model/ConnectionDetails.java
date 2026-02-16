@@ -48,7 +48,8 @@ public class ConnectionDetails implements Serializable {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ConnectionDetails that)) return false;
+        if (o == null || getClass() != o.getClass()) return false;
+        ConnectionDetails that = (ConnectionDetails) o;
         return Objects.equals(remoteAddr, that.remoteAddr) && Objects.equals(requestMethod, that.requestMethod) && Objects.equals(requestUri, that.requestUri);
     }
 
