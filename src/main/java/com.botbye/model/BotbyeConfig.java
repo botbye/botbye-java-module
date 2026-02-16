@@ -1,11 +1,10 @@
 package com.botbye.model;
 
-import okhttp3.MediaType;
-
 import java.io.Serializable;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import okhttp3.MediaType;
 
 public class BotbyeConfig implements Serializable {
     private static final String MODULE_VERSION = "0.0.1";

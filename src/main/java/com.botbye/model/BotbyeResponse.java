@@ -2,7 +2,6 @@ package com.botbye.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
-
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.UUID;
