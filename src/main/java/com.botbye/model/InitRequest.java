@@ -1,6 +1,6 @@
 package com.botbye.model;
 
-import java.io.*;
+import java.io.Serializable;
 
 public class InitRequest implements Serializable {
     private String serverKey;

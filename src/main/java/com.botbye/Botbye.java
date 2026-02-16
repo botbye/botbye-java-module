@@ -1,37 +1,16 @@
 package com.botbye;
 
-import com.botbye.model.BotbyeConfig;
-import com.botbye.model.BotbyeError;
-import com.botbye.model.BotbyeRequest;
-import com.botbye.model.BotbyeResponse;
-import com.botbye.model.ConnectionDetails;
 import com.botbye.model.Headers;
-import com.botbye.model.InitErrorResponse;
-import com.botbye.model.InitRequest;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
-import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.ConnectionPool;
-import okhttp3.Dispatcher;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
-import org.jetbrains.annotations.NotNull;
-
-import java.io.IOException;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import com.botbye.model.*;
+import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.module.*;
+import java.io.*;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.logging.*;
+import okhttp3.*;
+import org.jetbrains.annotations.*;
 
 public class Botbye {
     private static final Logger LOGGER = Logger.getLogger(Botbye.class.getName());
@@ -142,7 +121,7 @@ public class Botbye {
             Response response = client.newCall(request).execute();
             try (ResponseBody body = response.body()) {
                 if (body != null) {
-                    InitErrorResponse initResponse = reader.readValue(body.string(), InitErrorResponse.class);
+                    InitResponse initResponse = reader.readValue(body.string(), InitResponse.class);
                     if (initResponse.getError() != null || !"ok".equals(initResponse.getStatus())) {
                         LOGGER.warning("[BotBye] init-request error = " + initResponse.getError() + "; status = " + initResponse.getStatus());
                     }
@@ -189,4 +168,3 @@ public class Botbye {
                 .build();
     }
 }
-
