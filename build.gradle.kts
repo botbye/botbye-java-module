@@ -1,4 +1,5 @@
 import org.jreleaser.model.Active
+import java.time.LocalDate
 
 plugins {
     `maven-publish`
@@ -9,7 +10,7 @@ plugins {
 }
 
 group = "com.botbye"
-version = "0.0.1"
+version = "0.0.2"
 
 repositories {
     mavenCentral()
@@ -82,7 +83,7 @@ jreleaser {
     }
 
     project {
-        inceptionYear = "2023"
+        inceptionYear = "${LocalDate.now().year}"
         author("@botbye")
     }
 
