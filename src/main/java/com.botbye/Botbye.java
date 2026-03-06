@@ -21,7 +21,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -163,10 +162,6 @@ public class Botbye {
         }
     }
 
-    private static String normalizeBaseUrl(String url) {
-        return url.replaceAll("/+$", "");
-    }
-
     public BotbyePhishingResponse fetchImage(String origin) {
         return fetchImage(origin, null);
     }
@@ -195,12 +190,7 @@ public class Botbye {
                     .build();
         }
 
-        Request request = new Request.Builder()
-                .url(finalUrl)
-                .get()
-                .addHeader("X-Api-Key", conf.getApiKey())
-                .addHeader("Origin", origin != null ? origin : "origin is missing")
-                .build();
+        Request request = createPhishingRequest(finalUrl, origin, conf.getApiKey());
 
         try (Response response = client.newCall(request).execute()) {
             return getBotbyePhishingResponse(response);
@@ -240,9 +230,17 @@ public class Botbye {
         return new BotbyeRequest(botbyeConfig.getServerKey(), headers, connectionDetails, customFields);
     }
 
+    private Request createPhishingRequest(HttpUrl url, String origin, String apiKey) {
+        return new Request.Builder()
+                .url(url)
+                .get()
+                .addHeader("X-Api-Key", apiKey)
+                .addHeader("Origin", origin != null ? origin : "origin is missing")
+                .build();
+    }
+
     private Request createRequest(String token, BotbyeRequest body) throws JsonProcessingException {
-        String baseUrl = normalizeBaseUrl(botbyeConfig.getBotbyeEndpoint());
-        String url = baseUrl + "/validate-request/v2?" + Optional.ofNullable(token).orElse("");
+        String url = botbyeConfig.getBotbyeEndpoint() + "/validate-request/v2?" + Optional.ofNullable(token).orElse("");
 
         return new Request.Builder()
                 .url(url)

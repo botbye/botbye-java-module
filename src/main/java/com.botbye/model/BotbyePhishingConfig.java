@@ -1,5 +1,6 @@
 package com.botbye.model;
 
+import static com.botbye.model.BotbyeConfig.normalizeBaseUrl;
 import java.io.Serializable;
 import java.util.Objects;
 
@@ -10,13 +11,6 @@ public class BotbyePhishingConfig implements Serializable {
     private String apiKey;
 
     private BotbyePhishingConfig() {
-    }
-
-    public void requireConfigured() {
-        requireNonBlank(endpoint, "endpoint");
-        requireNonBlank(accountId, "accountId");
-        requireNonBlank(projectId, "projectId");
-        requireNonBlank(apiKey, "apiKey");
     }
 
     public static class Builder {
@@ -60,10 +54,6 @@ public class BotbyePhishingConfig implements Serializable {
             throw new IllegalStateException("[BotBye] phishing " + fieldName + " is not specified");
         }
         return value;
-    }
-
-    private static String normalizeBaseUrl(String url) {
-        return url.replaceAll("/+$", "");
     }
 
     public String getEndpoint() {

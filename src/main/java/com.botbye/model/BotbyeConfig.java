@@ -115,7 +115,7 @@ public class BotbyeConfig implements Serializable {
 
         public BotbyeConfig build() {
             BotbyeConfig config = new BotbyeConfig();
-            config.botbyeEndpoint = requireNonBlank(botbyeEndpoint, "botbye endpoint");
+            config.botbyeEndpoint = normalizeBaseUrl(requireNonBlank(botbyeEndpoint, "botbye endpoint"));
             config.serverKey = requireNonBlank(serverKey, "server key");
             config.readTimeout = this.readTimeout;
             config.writeTimeout = this.writeTimeout;
@@ -129,6 +129,10 @@ public class BotbyeConfig implements Serializable {
             config.contentType = this.contentType;
             return config;
         }
+    }
+
+    public static String normalizeBaseUrl(String url) {
+        return url.replaceAll("/+$", "");
     }
 
     private static String requireNonBlank(String value, String fieldName) {
