@@ -2,6 +2,8 @@ package com.botbye;
 
 import com.botbye.model.BotbyeConfig;
 import com.botbye.model.BotbyeError;
+import com.botbye.model.BotbyePhishingConfig;
+import com.botbye.model.BotbyePhishingResponse;
 import com.botbye.model.BotbyeRequest;
 import com.botbye.model.BotbyeResponse;
 import com.botbye.model.ConnectionDetails;
@@ -15,9 +17,11 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -25,6 +29,7 @@ import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
+import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
@@ -42,38 +47,47 @@ public class Botbye {
 
     private final ObjectReader reader = new ObjectMapper().reader();
     private final ObjectWriter writer = new ObjectMapper().registerModule(new SimpleModule().addSerializer(Headers.class, new HeadersSerializer())).writer();
-    private BotbyeConfig botbyeConfig = new BotbyeConfig();
+    private BotbyeConfig botbyeConfig;
+    private BotbyePhishingConfig botbyePhishingConfig;
     private final Dispatcher dispatcher = new Dispatcher();
     @SuppressWarnings("KotlinInternalInJava")
-    private final OkHttpClient client = new OkHttpClient().newBuilder()
-            .retryOnConnectionFailure(false)
-            .dispatcher(dispatcher)
-            .connectionPool(new ConnectionPool(
-                    botbyeConfig.getMaxIdleConnections(),
-                    botbyeConfig.getKeepAliveDuration(),
-                    botbyeConfig.getKeepAliveDurationTimeUnit())
-            )
-            .readTimeout(botbyeConfig.getReadTimeout())
-            .callTimeout(botbyeConfig.getCallTimeout())
-            .connectTimeout(botbyeConfig.getConnectionTimeout())
-            .writeTimeout(botbyeConfig.getWriteTimeout())
-            .build();
-
-    public Botbye() {
-        initRequest();
-    }
+    private OkHttpClient client;
 
     public Botbye(BotbyeConfig config) {
-        botbyeConfig = config;
-        dispatcher.setMaxRequests(botbyeConfig.getMaxRequests());
-        dispatcher.setMaxRequestsPerHost(botbyeConfig.getMaxRequestsPerHost());
+        setConf(config);
         initRequest();
     }
 
     public void setConf(BotbyeConfig config) {
+        if (config == null) {
+            throw new IllegalStateException("[BotBye] config is not specified");
+        }
+
         botbyeConfig = config;
         dispatcher.setMaxRequests(botbyeConfig.getMaxRequests());
         dispatcher.setMaxRequestsPerHost(botbyeConfig.getMaxRequestsPerHost());
+
+        client = new OkHttpClient().newBuilder()
+                .retryOnConnectionFailure(false)
+                .dispatcher(dispatcher)
+                .connectionPool(new ConnectionPool(
+                        botbyeConfig.getMaxIdleConnections(),
+                        botbyeConfig.getKeepAliveDuration(),
+                        botbyeConfig.getKeepAliveDurationTimeUnit())
+                )
+                .readTimeout(botbyeConfig.getReadTimeout())
+                .callTimeout(botbyeConfig.getCallTimeout())
+                .connectTimeout(botbyeConfig.getConnectionTimeout())
+                .writeTimeout(botbyeConfig.getWriteTimeout())
+                .build();
+    }
+
+    public void setPhishingConf(BotbyePhishingConfig config) {
+        if (config == null) {
+            throw new IllegalStateException("[BotBye] phishing config is not specified");
+        }
+
+        botbyePhishingConfig = config;
     }
 
     public BotbyeResponse validateRequest(String token, ConnectionDetails connectionDetails, Headers headers) {
@@ -81,8 +95,6 @@ public class Botbye {
     }
 
     public BotbyeResponse validateRequest(String token, ConnectionDetails connectionDetails, Headers headers, Map<String, String> customFields) {
-        validateServerKey();
-
         BotbyeRequest body = createBotbyeRequestBody(headers, connectionDetails, customFields);
 
         try {
@@ -100,7 +112,6 @@ public class Botbye {
     }
 
     public CompletableFuture<BotbyeResponse> validateRequestAsync(String token, ConnectionDetails connectionDetails, Headers headers, Map<String, String> customFields) {
-        validateServerKey();
         BotbyeRequest body = createBotbyeRequestBody(headers, connectionDetails, customFields);
 
         CompletableFuture<BotbyeResponse> future = new CompletableFuture<>();
@@ -152,11 +163,66 @@ public class Botbye {
         }
     }
 
-    private void validateServerKey() {
-        if (botbyeConfig.getServerKey().isBlank()) {
-            throw new IllegalStateException("[BotBye] server key is not specified");
+    private static String normalizeBaseUrl(String url) {
+        return url.replaceAll("/+$", "");
+    }
+
+    public BotbyePhishingResponse fetchImage(String origin) {
+        return fetchImage(origin, null);
+    }
+
+    public BotbyePhishingResponse fetchImage(String origin, String imageId) {
+        BotbyePhishingConfig conf = botbyePhishingConfig;
+        if (conf == null) {
+            return new BotbyePhishingResponse(0, Collections.emptyMap(), new byte[0], new BotbyeError("[BotBye] phishing is not configured"));
+        }
+
+        String baseUrl = conf.getEndpoint() + "/api/v1/phishing/" + conf.getAccountId() + "/projects/" + conf.getProjectId() + "/image";
+        HttpUrl url = HttpUrl.parse(baseUrl);
+        if (url == null) {
+            return new BotbyePhishingResponse(0, Collections.emptyMap(), new byte[0], new BotbyeError("[BotBye] invalid phishing endpoint url"));
+        }
+
+        HttpUrl finalUrl;
+        if (imageId == null || imageId.isBlank()) {
+            finalUrl = url.newBuilder()
+                    .addQueryParameter("format", "png")
+                    .build();
+        } else {
+            finalUrl = url.newBuilder()
+                    .addQueryParameter("image_id", imageId)
+                    .addQueryParameter("format", "svg")
+                    .build();
+        }
+
+        Request request = new Request.Builder()
+                .url(finalUrl)
+                .get()
+                .addHeader("X-Api-Key", conf.getApiKey())
+                .addHeader("Origin", origin != null ? origin : "origin is missing")
+                .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            return getBotbyePhishingResponse(response);
+        } catch (Exception e) {
+            LOGGER.warning("[BotBye] phishing image exception occurred: " + e.getMessage());
+            return new BotbyePhishingResponse(0, Collections.emptyMap(), new byte[0], new BotbyeError(e.getMessage() != null ? e.getMessage() : "[BotBye] failed to fetch phishing image"));
         }
     }
+
+    @NotNull
+    private BotbyePhishingResponse getBotbyePhishingResponse(Response response) throws IOException {
+        Map<String, String> headers = new HashMap<>();
+        for (String name : response.headers().names()) {
+            headers.put(name, response.header(name));
+        }
+
+        ResponseBody body = response.body();
+        byte[] bytes = body == null ? new byte[0] : body.bytes();
+
+        return new BotbyePhishingResponse(response.code(), headers, bytes);
+    }
+
 
     private BotbyeResponse handleResponse(Response response) {
         try (ResponseBody body = response.body()) {
@@ -175,10 +241,8 @@ public class Botbye {
     }
 
     private Request createRequest(String token, BotbyeRequest body) throws JsonProcessingException {
-        String url = botbyeConfig.getBotbyeEndpoint() +
-                botbyeConfig.getPath() +
-                "?" +
-                Optional.ofNullable(token).orElse("");
+        String baseUrl = normalizeBaseUrl(botbyeConfig.getBotbyeEndpoint());
+        String url = baseUrl + "/validate-request/v2?" + Optional.ofNullable(token).orElse("");
 
         return new Request.Builder()
                 .url(url)
@@ -187,4 +251,5 @@ public class Botbye {
                 .header("Module-Version", BotbyeConfig.getModuleVersion())
                 .build();
     }
+
 }

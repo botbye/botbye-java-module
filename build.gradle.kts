@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "com.botbye"
-version = "0.0.2"
+version = "0.0.3"
 
 repositories {
     mavenCentral()
@@ -30,6 +30,7 @@ tasks.withType<JavaCompile>().configureEach {
 dependencies {
     api("com.squareup.okhttp3:okhttp:4.12.0")
     api("com.fasterxml.jackson.core:jackson-databind:2.15.3")
+    api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.3")
 }
 
 publishing {
