@@ -9,20 +9,28 @@ plugins {
 }
 
 group = "com.botbye"
-version = "0.0.2"
+version = "0.0.3"
 
 repositories {
     mavenCentral()
 }
 
 java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(11))
+    }
     withSourcesJar()
     withJavadocJar()
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(11)
 }
 
 dependencies {
     api("com.squareup.okhttp3:okhttp:4.12.0")
     api("com.fasterxml.jackson.core:jackson-databind:2.15.3")
+    api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.3")
 }
 
 publishing {

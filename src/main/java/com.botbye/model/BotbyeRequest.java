@@ -59,7 +59,8 @@ public class BotbyeRequest implements Serializable {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof BotbyeRequest that)) return false;
+        if (o == null || getClass() != o.getClass()) return false;
+        BotbyeRequest that = (BotbyeRequest) o;
         return Objects.equals(serverKey, that.serverKey)
                 && Objects.equals(headers, that.headers)
                 && Objects.equals(requestInfo, that.requestInfo)
