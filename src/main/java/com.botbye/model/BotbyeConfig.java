@@ -41,7 +41,6 @@ public class BotbyeConfig implements Serializable {
     private BotbyeConfig() {
     }
 
-
     public static class Builder {
         private String botbyeEndpoint = DEFAULT_BOTBYE_ENDPOINT;
         private String serverKey;

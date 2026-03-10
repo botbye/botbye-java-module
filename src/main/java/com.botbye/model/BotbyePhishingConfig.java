@@ -14,7 +14,7 @@ public class BotbyePhishingConfig implements Serializable {
     }
 
     public static class Builder {
-        private String endpoint = "";
+        private String endpoint = "https://verify.botbye.com";
         private String accountId = "";
         private String projectId = "";
         private String apiKey = "";
