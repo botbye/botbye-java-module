@@ -3,7 +3,6 @@ package com.botbye.model;
 import java.io.Serializable;
 import java.time.Duration;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 import okhttp3.MediaType;
 
 public class BotbyeConfig implements Serializable {
@@ -16,8 +15,7 @@ public class BotbyeConfig implements Serializable {
     private static final Duration DEFAULT_CONNECTION_TIMEOUT = Duration.ofSeconds(2);
     private static final Duration DEFAULT_CALL_TIMEOUT = Duration.ofSeconds(5);
     private static final int DEFAULT_MAX_IDLE_CONNECTIONS = 250;
-    private static final long DEFAULT_KEEP_ALIVE_DURATION = 5L;
-    private static final TimeUnit DEFAULT_KEEP_ALIVE_DURATION_TIME_UNIT = TimeUnit.MINUTES;
+    private static final Duration DEFAULT_KEEP_ALIVE_DURATION = Duration.ofSeconds(300);
     private static final int DEFAULT_MAX_REQUESTS_PER_HOST = 1500;
     private static final int DEFAULT_MAX_REQUESTS = 1500;
     private static final MediaType DEFAULT_CONTENT_TYPE = MediaType.parse("application/json");
@@ -32,8 +30,7 @@ public class BotbyeConfig implements Serializable {
     private Duration callTimeout;
     // pool config
     private int maxIdleConnections;
-    private long keepAliveDuration;
-    private TimeUnit keepAliveDurationTimeUnit;
+    private Duration keepAliveDuration;
     // dispatcher
     private int maxRequestsPerHost;
     private int maxRequests;
@@ -49,8 +46,7 @@ public class BotbyeConfig implements Serializable {
         private Duration connectionTimeout = DEFAULT_CONNECTION_TIMEOUT;
         private Duration callTimeout = DEFAULT_CALL_TIMEOUT;
         private int maxIdleConnections = DEFAULT_MAX_IDLE_CONNECTIONS;
-        private long keepAliveDuration = DEFAULT_KEEP_ALIVE_DURATION;
-        private TimeUnit keepAliveDurationTimeUnit = DEFAULT_KEEP_ALIVE_DURATION_TIME_UNIT;
+        private Duration keepAliveDuration = DEFAULT_KEEP_ALIVE_DURATION;
         private int maxRequestsPerHost = DEFAULT_MAX_REQUESTS_PER_HOST;
         private int maxRequests = DEFAULT_MAX_REQUESTS;
         private MediaType contentType = DEFAULT_CONTENT_TYPE;
@@ -91,9 +87,8 @@ public class BotbyeConfig implements Serializable {
             return this;
         }
 
-        public Builder keepAliveDuration(long keepAliveDuration, TimeUnit unit) {
+        public Builder keepAliveDuration(Duration keepAliveDuration) {
             this.keepAliveDuration = keepAliveDuration;
-            this.keepAliveDurationTimeUnit = unit;
             return this;
         }
 
@@ -122,7 +117,6 @@ public class BotbyeConfig implements Serializable {
             config.callTimeout = this.callTimeout;
             config.maxIdleConnections = this.maxIdleConnections;
             config.keepAliveDuration = this.keepAliveDuration;
-            config.keepAliveDurationTimeUnit = this.keepAliveDurationTimeUnit;
             config.maxRequestsPerHost = this.maxRequestsPerHost;
             config.maxRequests = this.maxRequests;
             config.contentType = this.contentType;
@@ -182,12 +176,8 @@ public class BotbyeConfig implements Serializable {
         return maxIdleConnections;
     }
 
-    public long getKeepAliveDuration() {
+    public Duration getKeepAliveDuration() {
         return keepAliveDuration;
-    }
-
-    public TimeUnit getKeepAliveDurationTimeUnit() {
-        return keepAliveDurationTimeUnit;
     }
 
     public int getMaxRequestsPerHost() {
@@ -203,12 +193,12 @@ public class BotbyeConfig implements Serializable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         BotbyeConfig that = (BotbyeConfig) o;
-        return maxIdleConnections == that.maxIdleConnections && keepAliveDuration == that.keepAliveDuration && maxRequestsPerHost == that.maxRequestsPerHost && maxRequests == that.maxRequests && Objects.equals(botbyeEndpoint, that.botbyeEndpoint) && Objects.equals(serverKey, that.serverKey) && Objects.equals(contentType, that.contentType) && Objects.equals(readTimeout, that.readTimeout) && Objects.equals(writeTimeout, that.writeTimeout) && Objects.equals(connectionTimeout, that.connectionTimeout) && Objects.equals(callTimeout, that.callTimeout) && keepAliveDurationTimeUnit == that.keepAliveDurationTimeUnit;
+        return maxIdleConnections == that.maxIdleConnections && maxRequestsPerHost == that.maxRequestsPerHost && maxRequests == that.maxRequests && Objects.equals(botbyeEndpoint, that.botbyeEndpoint) && Objects.equals(serverKey, that.serverKey) && Objects.equals(contentType, that.contentType) && Objects.equals(readTimeout, that.readTimeout) && Objects.equals(writeTimeout, that.writeTimeout) && Objects.equals(connectionTimeout, that.connectionTimeout) && Objects.equals(callTimeout, that.callTimeout) && Objects.equals(keepAliveDuration, that.keepAliveDuration);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(botbyeEndpoint, serverKey, contentType, readTimeout, writeTimeout, connectionTimeout, callTimeout, maxIdleConnections, keepAliveDuration, keepAliveDurationTimeUnit, maxRequestsPerHost, maxRequests);
+        return Objects.hash(botbyeEndpoint, serverKey, contentType, readTimeout, writeTimeout, connectionTimeout, callTimeout, maxIdleConnections, keepAliveDuration, maxRequestsPerHost, maxRequests);
     }
 
     @Override
@@ -223,7 +213,6 @@ public class BotbyeConfig implements Serializable {
                 ", callTimeout=" + callTimeout +
                 ", maxIdleConnections=" + maxIdleConnections +
                 ", keepAliveDuration=" + keepAliveDuration +
-                ", keepAliveDurationTimeUnit=" + keepAliveDurationTimeUnit +
                 ", maxRequestsPerHost=" + maxRequestsPerHost +
                 ", maxRequests=" + maxRequests +
                 '}';

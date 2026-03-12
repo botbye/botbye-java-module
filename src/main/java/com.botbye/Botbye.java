@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -71,8 +72,8 @@ public class Botbye {
                 .dispatcher(dispatcher)
                 .connectionPool(new ConnectionPool(
                         botbyeConfig.getMaxIdleConnections(),
-                        botbyeConfig.getKeepAliveDuration(),
-                        botbyeConfig.getKeepAliveDurationTimeUnit())
+                        botbyeConfig.getKeepAliveDuration().toMillis(),
+                        TimeUnit.MILLISECONDS)
                 )
                 .readTimeout(botbyeConfig.getReadTimeout())
                 .callTimeout(botbyeConfig.getCallTimeout())
