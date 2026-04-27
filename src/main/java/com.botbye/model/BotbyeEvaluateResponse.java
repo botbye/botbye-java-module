@@ -1,27 +1,26 @@
 package com.botbye.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import java.io.Serializable;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class BotbyeEvaluateResponse implements Serializable {
-    private UUID requestId = UUID.fromString("00000000-0000-0000-0000-000000000000");
+    private UUID requestId;
     private BotbyeDecision decision = BotbyeDecision.ALLOW;
-    private double riskScore = 0.0;
-    private List<String> signals = Collections.emptyList();
-    private Map<String, Double> scores = Collections.emptyMap();
+    private Double riskScore;
+    private List<String> signals;
+    private Map<String, Double> scores;
     private BotbyeEvaluateConfig config = new BotbyeEvaluateConfig();
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BotbyeChallenge challenge;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BotbyeExtraData extraData;
     private BotbyeError error;
 
@@ -39,6 +38,7 @@ public class BotbyeEvaluateResponse implements Serializable {
         this.error = error;
     }
 
+    @JsonIgnore
     public boolean isBlocked() {
         return BotbyeDecision.BLOCK == decision;
     }
@@ -59,11 +59,11 @@ public class BotbyeEvaluateResponse implements Serializable {
         this.decision = decision;
     }
 
-    public double getRiskScore() {
+    public Double getRiskScore() {
         return riskScore;
     }
 
-    public void setRiskScore(double riskScore) {
+    public void setRiskScore(Double riskScore) {
         this.riskScore = riskScore;
     }
 

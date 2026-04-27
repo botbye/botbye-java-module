@@ -14,6 +14,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import java.io.IOException;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
@@ -107,7 +109,7 @@ public class Botbye {
             return handleEvaluateResponse(response);
         } catch (IOException e) {
             LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
-            return new BotbyeEvaluateResponse(BYPASS_CONFIG, new BotbyeError(e.getMessage()));
+            return new BotbyeEvaluateResponse(BYPASS_CONFIG, new BotbyeError(classifyError(e)));
         }
     }
 
@@ -128,12 +130,12 @@ public class Botbye {
                 @Override
                 public void onFailure(@NotNull Call call, @NotNull IOException e) {
                     LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
-                    future.complete(new BotbyeEvaluateResponse(BYPASS_CONFIG, new BotbyeError(e.getMessage())));
+                    future.complete(new BotbyeEvaluateResponse(BYPASS_CONFIG, new BotbyeError(classifyError(e))));
                 }
             });
         } catch (IOException e) {
             LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
-            future.complete(new BotbyeEvaluateResponse(BYPASS_CONFIG, new BotbyeError(e.getMessage())));
+            future.complete(new BotbyeEvaluateResponse(BYPASS_CONFIG, new BotbyeError(classifyError(e))));
         }
 
         return future;
@@ -240,14 +242,24 @@ public class Botbye {
 
     private BotbyeEvaluateResponse handleEvaluateResponse(Response response) {
         try (ResponseBody body = response.body()) {
+            if (response.code() >= 500) {
+                throw new IOException("connection error: HTTP " + response.code());
+            }
             if (body == null) {
                 return new BotbyeEvaluateResponse(BYPASS_CONFIG);
             }
             return reader.readValue(body.string(), BotbyeEvaluateResponse.class);
         } catch (IOException e) {
             LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
-            return new BotbyeEvaluateResponse(BYPASS_CONFIG, new BotbyeError(e.getMessage()));
+            return new BotbyeEvaluateResponse(BYPASS_CONFIG, new BotbyeError(classifyError(e)));
         }
+    }
+
+    private String classifyError(Exception e) {
+        if (e instanceof SocketTimeoutException) return "timeout";
+        if (e instanceof ConnectException) return "connection error";
+        if (e instanceof JsonProcessingException) return "invalid json response";
+        return e.getMessage() != null ? e.getMessage() : "unknown error";
     }
 
     private Request buildEvaluateHttpRequest(String url, ObjectWriter writer, BotbyeEvent event) throws JsonProcessingException {
