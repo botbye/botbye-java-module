@@ -32,10 +32,6 @@ public final class BotbyeValidationEvent implements BotbyeEvent, Serializable {
         this.customFields = customFields;
     }
 
-    public static BotbyeValidationEvent of(String ip, String token, Map<String, String> headers, String requestUri) {
-        return of(ip, token, headers, null, requestUri, Collections.emptyMap());
-    }
-
     public static BotbyeValidationEvent of(
             String ip,
             String token,
