@@ -6,8 +6,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import java.io.Serializable;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -17,24 +17,18 @@ public class BotbyeEvaluateResponse implements Serializable {
     private UUID requestId;
     private BotbyeDecision decision = BotbyeDecision.ALLOW;
     private Double riskScore;
-    private List<String> signals;
+    private Set<String> signals;
     private Map<String, Double> scores;
-    private BotbyeEvaluateConfig config = new BotbyeEvaluateConfig();
     private BotbyeChallenge challenge;
     private BotbyeExtraData extraData;
     private BotbyeError error;
+    private String botbyeResult;
 
     public BotbyeEvaluateResponse() {
     }
 
-    /** Creates a fallback/bypass response with the given config. */
-    public BotbyeEvaluateResponse(BotbyeEvaluateConfig config) {
-        this.config = config;
-    }
-
-    /** Creates a fallback/bypass response with the given config and error. */
-    public BotbyeEvaluateResponse(BotbyeEvaluateConfig config, BotbyeError error) {
-        this.config = config;
+    /** Creates a fallback/bypass response with the given error. */
+    public BotbyeEvaluateResponse(BotbyeError error) {
         this.error = error;
     }
 
@@ -67,11 +61,11 @@ public class BotbyeEvaluateResponse implements Serializable {
         this.riskScore = riskScore;
     }
 
-    public List<String> getSignals() {
+    public Set<String> getSignals() {
         return signals;
     }
 
-    public void setSignals(List<String> signals) {
+    public void setSignals(Set<String> signals) {
         this.signals = signals;
     }
 
@@ -81,14 +75,6 @@ public class BotbyeEvaluateResponse implements Serializable {
 
     public void setScores(Map<String, Double> scores) {
         this.scores = scores;
-    }
-
-    public BotbyeEvaluateConfig getConfig() {
-        return config;
-    }
-
-    public void setConfig(BotbyeEvaluateConfig config) {
-        this.config = config;
     }
 
     public BotbyeChallenge getChallenge() {
@@ -115,6 +101,14 @@ public class BotbyeEvaluateResponse implements Serializable {
         this.error = error;
     }
 
+    public String getBotbyeResult() {
+        return botbyeResult;
+    }
+
+    public void setBotbyeResult(String botbyeResult) {
+        this.botbyeResult = botbyeResult;
+    }
+
     @Override
     public String toString() {
         return "BotbyeEvaluateResponse{" +
@@ -123,10 +117,10 @@ public class BotbyeEvaluateResponse implements Serializable {
                 ", riskScore=" + riskScore +
                 ", signals=" + signals +
                 ", scores=" + scores +
-                ", config=" + config +
                 ", challenge=" + challenge +
                 ", extraData=" + extraData +
                 ", error=" + error +
+                ", botbyeResult=" + botbyeResult +
                 '}';
     }
 }

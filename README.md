@@ -14,13 +14,13 @@ BotBye goes beyond fixed bot/ATO checks. Risk dimensions and metrics are fully d
 ### Gradle (Kotlin DSL)
 
 ```kotlin
-implementation("com.botbye:java-module:2.0.0")
+implementation("com.botbye:java-module:2.1.0")
 ```
 
 ### Gradle (Groovy DSL)
 
 ```groovy
-implementation 'com.botbye:java-module:2.0.0'
+implementation 'com.botbye:java-module:2.1.0'
 ```
 
 ### Maven
@@ -29,7 +29,7 @@ implementation 'com.botbye:java-module:2.0.0'
 <dependency>
     <groupId>com.botbye</groupId>
     <artifactId>java-module</artifactId>
-    <version>2.0.0</version>
+    <version>2.1.0</version>
 </dependency>
 ```
 
@@ -84,9 +84,6 @@ if (response.isBlocked()) {
     httpResponse.setStatus(403);
     return;
 }
-
-// Propagate bot score to Level 2 via header
-httpResponse.setHeader(Botbye.RESULT_HEADER, botbye.encodeResult(response));
 ```
 
 ### 3. Risk Scoring & Event Logging (Level 2)
@@ -203,11 +200,11 @@ future.thenAccept(response -> {
 | `decision` | `BotbyeDecision` | `ALLOW`, `CHALLENGE`, or `BLOCK` |
 | `riskScore` | `Double` | Overall risk score (0–1) |
 | `scores` | `Map<String, Double>` | Per-dimension scores (`bot`, `ato`, `abuse`, ...) |
-| `signals` | `List<String>` | Triggered signal names (e.g., `BruteForce`, `ImpossibleTravel`) |
+| `signals` | `Set<String>` | Triggered signal names (e.g., `BruteForce`, `ImpossibleTravel`) |
 | `challenge` | `BotbyeChallenge` | Challenge type and token (when decision is `CHALLENGE`) |
 | `extraData` | `BotbyeExtraData` | Enriched device data (IP, country, browser, device, etc.) |
-| `config` | `BotbyeEvaluateConfig` | Config flags (`bypassBotValidation`) |
 | `error` | `BotbyeError` | Error details (on fallback) |
+| `botbyeResult` | `String` | Encoded result for Level 1→2 propagation |
 
 ```java
 response.getDecision();              // BotbyeDecision.ALLOW
@@ -221,20 +218,16 @@ response.getExtraData().getCountry();// "US"
 
 ## Level 1 to Level 2 Propagation
 
-When using both levels, propagate the Level 1 result to Level 2 via the `X-Botbye-Result` header. This allows the platform to link both evaluations by `requestId` and combine bot score from Level 1 with risk scores from Level 2 into a single unified result:
+When using both levels, propagate the Level 1 result to Level 2 via the `botbyeResult` field from the response. This allows the platform to link both evaluations by `requestId` and combine bot score from Level 1 with risk scores from Level 2 into a single unified result:
 
 ```java
-// Level 1 (proxy) — validate and forward result
-BotbyeEvaluateResponse response = botbye.evaluate(BotbyeValidationEvent.of(...));
-httpResponse.setHeader(Botbye.RESULT_HEADER, botbye.encodeResult(response));
+// Level 1 (proxy) — validate and get result
+BotbyeEvaluateResponse l1Response = botbye.evaluate(BotbyeValidationEvent.of(...));
 
-// Or bypass validation entirely
-httpResponse.setHeader(Botbye.RESULT_HEADER, botbye.bypassResult());
-
-// Level 2 (middleware) — pass the header value as botbyeResult
-BotbyeEvaluateResponse response = botbye.evaluate(BotbyeRiskScoringEvent.of(
+// Pass botbyeResult to Level 2 (e.g. via header or directly)
+BotbyeEvaluateResponse l2Response = botbye.evaluate(BotbyeRiskScoringEvent.of(
     // ...
-    request.getHeader("X-Botbye-Result"),
+    l1Response.getBotbyeResult(),
     Collections.emptyMap()
 ));
 ```
@@ -258,7 +251,7 @@ BotbyeConfig config = new BotbyeConfig.Builder()
 
 ## Error Handling
 
-The SDK follows a **fail-open** strategy. On network or server errors, `evaluate()` returns a bypass response (`BotbyeDecision.ALLOW` with `bypassBotValidation = true`) instead of throwing:
+The SDK follows a **fail-open** strategy. On network or server errors, `evaluate()` returns a default response (`BotbyeDecision.ALLOW` with error details) instead of throwing:
 
 ```java
 BotbyeEvaluateResponse response = botbye.evaluate(event);
@@ -316,7 +309,6 @@ public class BotbyeFilter extends OncePerRequestFilter {
             return;
         }
 
-        response.setHeader(Botbye.RESULT_HEADER, botbye.encodeResult(result));
         filterChain.doFilter(request, response);
     }
 }

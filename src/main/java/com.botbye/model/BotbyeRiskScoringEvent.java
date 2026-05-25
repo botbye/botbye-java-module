@@ -13,9 +13,6 @@ import java.util.Map;
  * Level 2: Risk evaluation (middleware, post-authentication).
  * Evaluates ATO/abuse risk using user context and dynamic metrics.
  * Bot score comes from Level 1 result ({@code botbyeResult}).
- *
- * When {@code botbyeResult} is null/blank (no Level 1 proxy), {@code config.bypassBotValidation}
- * is set to {@code true} automatically so the server skips the bot engine and uses score 0.0.
  */
 @JsonAppend(attrs = {@JsonAppend.Attr(value = "server_key")})
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -29,7 +26,6 @@ public final class BotbyeRiskScoringEvent implements BotbyeEvent, Serializable {
     private final BotbyeRequestInfo request;
     private final BotbyeEventInfo event;
     private final BotbyeUserInfo user;
-    private final BotbyeEvaluateConfig config;
     private final String botbyeResult;
     private final Map<String, String> customFields;
 
@@ -37,14 +33,12 @@ public final class BotbyeRiskScoringEvent implements BotbyeEvent, Serializable {
             BotbyeRequestInfo request,
             BotbyeEventInfo event,
             BotbyeUserInfo user,
-            BotbyeEvaluateConfig config,
             String botbyeResult,
             Map<String, String> customFields
     ) {
         this.request = request;
         this.event = event;
         this.user = user;
-        this.config = config;
         this.botbyeResult = botbyeResult;
         this.customFields = customFields;
     }
@@ -74,7 +68,6 @@ public final class BotbyeRiskScoringEvent implements BotbyeEvent, Serializable {
             new BotbyeRequestInfo(ip, headers),
             new BotbyeEventInfo(eventType, eventStatus),
             user,
-            new BotbyeEvaluateConfig(!hasResult),
             hasResult ? botbyeResult : null,
             customFields != null ? customFields : Collections.emptyMap()
         );
@@ -100,10 +93,6 @@ public final class BotbyeRiskScoringEvent implements BotbyeEvent, Serializable {
 
     public BotbyeUserInfo getUser() {
         return user;
-    }
-
-    public BotbyeEvaluateConfig getConfig() {
-        return config;
     }
 
     public String getBotbyeResult() {

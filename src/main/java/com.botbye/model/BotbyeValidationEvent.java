@@ -23,12 +23,10 @@ public final class BotbyeValidationEvent implements BotbyeEvent, Serializable {
 
     private final BotbyeIntegrationInfo integration = INTEGRATION;
     private final BotbyeRequestInfo request;
-    private final BotbyeEvaluateConfig config;
     private final Map<String, String> customFields;
 
-    public BotbyeValidationEvent(BotbyeRequestInfo request, BotbyeEvaluateConfig config, Map<String, String> customFields) {
+    public BotbyeValidationEvent(BotbyeRequestInfo request, Map<String, String> customFields) {
         this.request = request;
-        this.config = config;
         this.customFields = customFields;
     }
 
@@ -42,7 +40,6 @@ public final class BotbyeValidationEvent implements BotbyeEvent, Serializable {
     ) {
         return new BotbyeValidationEvent(
             new BotbyeRequestInfo(ip, token, headers, requestMethod, requestUri),
-            new BotbyeEvaluateConfig(),
             customFields != null ? customFields : Collections.emptyMap()
         );
     }
@@ -59,10 +56,6 @@ public final class BotbyeValidationEvent implements BotbyeEvent, Serializable {
 
     public BotbyeRequestInfo getRequest() {
         return request;
-    }
-
-    public BotbyeEvaluateConfig getConfig() {
-        return config;
     }
 
     public Map<String, String> getCustomFields() {

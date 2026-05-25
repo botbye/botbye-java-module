@@ -13,7 +13,6 @@ import java.util.Map;
  * Combined Level 1+2: Bot validation + risk evaluation in a single call.
  * Use when there is no separate proxy — the middleware validates the token
  * and evaluates ATO/abuse risk in one request.
- * {@code config.bypassBotValidation} is always {@code false}.
  */
 @JsonAppend(attrs = {@JsonAppend.Attr(value = "server_key")})
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -27,20 +26,17 @@ public final class BotbyeFullEvent implements BotbyeEvent, Serializable {
     private final BotbyeRequestInfo request;
     private final BotbyeEventInfo event;
     private final BotbyeUserInfo user;
-    private final BotbyeEvaluateConfig config;
     private final Map<String, String> customFields;
 
     public BotbyeFullEvent(
             BotbyeRequestInfo request,
             BotbyeEventInfo event,
             BotbyeUserInfo user,
-            BotbyeEvaluateConfig config,
             Map<String, String> customFields
     ) {
         this.request = request;
         this.event = event;
         this.user = user;
-        this.config = config;
         this.customFields = customFields;
     }
 
@@ -70,7 +66,6 @@ public final class BotbyeFullEvent implements BotbyeEvent, Serializable {
             new BotbyeRequestInfo(ip, token, headers, requestMethod, requestUri),
             new BotbyeEventInfo(eventType, eventStatus),
             user,
-            new BotbyeEvaluateConfig(),
             customFields != null ? customFields : Collections.emptyMap()
         );
     }
@@ -95,10 +90,6 @@ public final class BotbyeFullEvent implements BotbyeEvent, Serializable {
 
     public BotbyeUserInfo getUser() {
         return user;
-    }
-
-    public BotbyeEvaluateConfig getConfig() {
-        return config;
     }
 
     public Map<String, String> getCustomFields() {

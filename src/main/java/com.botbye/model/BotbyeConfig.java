@@ -6,7 +6,7 @@ import java.util.Objects;
 import okhttp3.MediaType;
 
 public class BotbyeConfig implements Serializable {
-    private static final String MODULE_VERSION = "2.0.0";
+    private static final String MODULE_VERSION = "2.1.0";
     private static final String MODULE_NAME = "Java";
 
     private static final String DEFAULT_BOTBYE_ENDPOINT = "https://verify.botbye.com";

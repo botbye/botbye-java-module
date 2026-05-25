@@ -2,7 +2,6 @@ package com.botbye;
 
 import com.botbye.model.BotbyeConfig;
 import com.botbye.model.BotbyeError;
-import com.botbye.model.BotbyeEvaluateConfig;
 import com.botbye.model.BotbyeEvaluateResponse;
 import com.botbye.model.BotbyeEvent;
 import com.botbye.model.BotbyePhishingConfig;
@@ -16,7 +15,6 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -38,10 +36,7 @@ import okhttp3.ResponseBody;
 import org.jetbrains.annotations.NotNull;
 
 public class Botbye {
-    public static final String RESULT_HEADER = "X-Botbye-Result";
-
     private static final Logger LOGGER = Logger.getLogger(Botbye.class.getName());
-    private static final BotbyeEvaluateConfig BYPASS_CONFIG = new BotbyeEvaluateConfig(true);
 
     static {
         LOGGER.setLevel(Level.WARNING);
@@ -50,7 +45,6 @@ public class Botbye {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final ObjectReader reader = mapper.reader();
-    private final String bypassResultBase64;
 
     private BotbyeConfig botbyeConfig;
     private BotbyePhishingConfig botbyePhishingConfig;
@@ -61,7 +55,6 @@ public class Botbye {
 
     public Botbye(BotbyeConfig config) {
         setConf(config);
-        bypassResultBase64 = computeBypassResult();
         initRequest();
     }
 
@@ -109,7 +102,7 @@ public class Botbye {
             return handleEvaluateResponse(response);
         } catch (IOException e) {
             LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
-            return new BotbyeEvaluateResponse(BYPASS_CONFIG, new BotbyeError(classifyError(e)));
+            return new BotbyeEvaluateResponse(new BotbyeError(classifyError(e)));
         }
     }
 
@@ -130,38 +123,15 @@ public class Botbye {
                 @Override
                 public void onFailure(@NotNull Call call, @NotNull IOException e) {
                     LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
-                    future.complete(new BotbyeEvaluateResponse(BYPASS_CONFIG, new BotbyeError(classifyError(e))));
+                    future.complete(new BotbyeEvaluateResponse(new BotbyeError(classifyError(e))));
                 }
             });
         } catch (IOException e) {
             LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
-            future.complete(new BotbyeEvaluateResponse(BYPASS_CONFIG, new BotbyeError(classifyError(e))));
+            future.complete(new BotbyeEvaluateResponse(new BotbyeError(classifyError(e))));
         }
 
         return future;
-    }
-
-    /**
-     * Encodes evaluate response as base64 JSON for propagation
-     * to Level 2 via {@link #RESULT_HEADER}.
-     * Mirrors openresty {@code M.encodeResult()}.
-     */
-    public String encodeResult(BotbyeEvaluateResponse response) {
-        try {
-            return Base64.getEncoder().encodeToString(mapper.writeValueAsBytes(response));
-        } catch (JsonProcessingException e) {
-            LOGGER.warning("[BotBye] encodeResult failed: " + e.getMessage());
-            return bypassResultBase64;
-        }
-    }
-
-    /**
-     * Returns pre-computed bypass result (base64 JSON with {@code bypass_bot_validation = true}).
-     * Use when request should not be validated (excluded URI, service token, etc).
-     * Mirrors openresty {@code M.propagateBypass()}.
-     */
-    public String bypassResult() {
-        return bypassResultBase64;
     }
 
     private void initRequest() {
@@ -246,12 +216,12 @@ public class Botbye {
                 throw new IOException("connection error: HTTP " + response.code());
             }
             if (body == null) {
-                return new BotbyeEvaluateResponse(BYPASS_CONFIG);
+                return new BotbyeEvaluateResponse();
             }
             return reader.readValue(body.string(), BotbyeEvaluateResponse.class);
         } catch (IOException e) {
             LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
-            return new BotbyeEvaluateResponse(BYPASS_CONFIG, new BotbyeError(classifyError(e)));
+            return new BotbyeEvaluateResponse(new BotbyeError(classifyError(e)));
         }
     }
 
@@ -259,6 +229,8 @@ public class Botbye {
         if (e instanceof SocketTimeoutException) return "timeout";
         if (e instanceof ConnectException) return "connection error";
         if (e instanceof JsonProcessingException) return "invalid json response";
+        if (e instanceof java.io.IOException) return "connection error";
+        if (e.getMessage() != null && e.getMessage().startsWith("connection error")) return "connection error";
         return e.getMessage() != null ? e.getMessage() : "unknown error";
     }
 
@@ -271,14 +243,4 @@ public class Botbye {
                 .build();
     }
 
-    private String computeBypassResult() {
-        try {
-            return Base64.getEncoder().encodeToString(
-                mapper.writeValueAsBytes(new BotbyeEvaluateResponse(BYPASS_CONFIG))
-            );
-        } catch (JsonProcessingException e) {
-            LOGGER.warning("[BotBye] failed to compute bypass result: " + e.getMessage());
-            return "";
-        }
-    }
 }
