@@ -190,6 +190,47 @@ future.thenAccept(response -> {
 });
 ```
 
+### 5. Phishing Image Tracking
+
+The phishing tracking pixel is embedded on a protected site; when a phishing clone copies the
+markup, the pixel is requested with the clone's `Origin`, which lets BotBye record a phishing
+candidate.
+
+The project is identified by a public, browser-safe `clientKey` in the URL path, so **no server
+key is sent** — phishing uses its own client key, separate from the evaluate `serverKey`.
+
+Configure phishing once (independently of the evaluate config), then forward the incoming `Origin`:
+
+```java
+import com.botbye.model.BotbyePhishingConfig;
+import com.botbye.model.BotbyePhishingResponse;
+
+botbye.setPhishingConf(new BotbyePhishingConfig.Builder()
+    .endpoint("https://verify.botbye.com") // default
+    .clientKey("<public-client-key>")
+    .build());
+
+// Default PNG pixel
+BotbyePhishingResponse res = botbye.fetchImage(request.getHeader("Origin"));
+
+// SVG variant — pass an imageId
+BotbyePhishingResponse svg = botbye.fetchImage(request.getHeader("Origin"), "hero-banner");
+
+res.getStatus();   // 200
+res.getHeaders();  // {Content-Type=image/png, ...}
+res.getBody();     // byte[] — raw image bytes to relay back to the browser
+res.getError();    // BotbyeError — non-null on transport failure
+```
+
+`fetchImage` returns `BotbyePhishingResponse`:
+
+| Field | Type | Description |
+|---|---|---|
+| `status` | `int` | Upstream HTTP status (`0` on transport failure) |
+| `headers` | `Map<String, String>` | Response headers (e.g. `Content-Type`) |
+| `body` | `byte[]` | Raw image bytes (PNG, or SVG when `imageId` is set) |
+| `error` | `BotbyeError` | Normalized transport error: `timeout`, `connection error`, or `invalid json response` |
+
 ## Response
 
 `BotbyeEvaluateResponse` contains:

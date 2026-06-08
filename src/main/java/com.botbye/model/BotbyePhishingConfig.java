@@ -6,45 +6,29 @@ import java.util.Objects;
 
 public class BotbyePhishingConfig implements Serializable {
     private String endpoint;
-    private String accountId;
-    private String projectId;
-    private String apiKey;
+    private String clientKey;
 
     private BotbyePhishingConfig() {
     }
 
     public static class Builder {
         private String endpoint = "https://verify.botbye.com";
-        private String accountId = "";
-        private String projectId = "";
-        private String apiKey = "";
+        private String clientKey = "";
 
         public Builder endpoint(String endpoint) {
             this.endpoint = endpoint;
             return this;
         }
 
-        public Builder accountId(String accountId) {
-            this.accountId = accountId;
-            return this;
-        }
-
-        public Builder projectId(String projectId) {
-            this.projectId = projectId;
-            return this;
-        }
-
-        public Builder apiKey(String apiKey) {
-            this.apiKey = apiKey;
+        public Builder clientKey(String clientKey) {
+            this.clientKey = clientKey;
             return this;
         }
 
         public BotbyePhishingConfig build() {
             BotbyePhishingConfig config = new BotbyePhishingConfig();
             config.endpoint = normalizeBaseUrl(requireNonBlank(endpoint, "endpoint"));
-            config.accountId = requireNonBlank(accountId, "accountId");
-            config.projectId = requireNonBlank(projectId, "projectId");
-            config.apiKey = requireNonBlank(apiKey, "apiKey");
+            config.clientKey = requireNonBlank(clientKey, "clientKey");
             return config;
         }
     }
@@ -60,16 +44,8 @@ public class BotbyePhishingConfig implements Serializable {
         return endpoint;
     }
 
-    public String getAccountId() {
-        return accountId;
-    }
-
-    public String getProjectId() {
-        return projectId;
-    }
-
-    public String getApiKey() {
-        return apiKey;
+    public String getClientKey() {
+        return clientKey;
     }
 
     @Override
@@ -78,23 +54,19 @@ public class BotbyePhishingConfig implements Serializable {
         if (o == null || getClass() != o.getClass()) return false;
         BotbyePhishingConfig that = (BotbyePhishingConfig) o;
         return Objects.equals(endpoint, that.endpoint)
-                && Objects.equals(accountId, that.accountId)
-                && Objects.equals(projectId, that.projectId)
-                && Objects.equals(apiKey, that.apiKey);
+                && Objects.equals(clientKey, that.clientKey);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(endpoint, accountId, projectId, apiKey);
+        return Objects.hash(endpoint, clientKey);
     }
 
     @Override
     public String toString() {
         return "BotbyePhishingConfig{" +
                 "endpoint='" + endpoint + '\'' +
-                ", accountId='" + accountId + '\'' +
-                ", projectId='" + projectId + '\'' +
-                ", apiKey='" + apiKey + '\'' +
+                ", clientKey='" + clientKey + '\'' +
                 '}';
     }
 }

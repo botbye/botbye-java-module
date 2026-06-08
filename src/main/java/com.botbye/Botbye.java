@@ -52,6 +52,10 @@ public class Botbye {
     private final Dispatcher dispatcher = new Dispatcher();
     @SuppressWarnings("KotlinInternalInJava")
     private OkHttpClient client;
+    // Phishing fetchImage is an idempotent GET; this client retries on connection
+    // failure so a stale pooled keep-alive connection (closed by the server while idle)
+    // is transparently re-established instead of failing with "unexpected end of stream".
+    private OkHttpClient phishingClient;
 
     public Botbye(BotbyeConfig config) {
         setConf(config);
@@ -80,6 +84,11 @@ public class Botbye {
                 .callTimeout(botbyeConfig.getCallTimeout())
                 .connectTimeout(botbyeConfig.getConnectionTimeout())
                 .writeTimeout(botbyeConfig.getWriteTimeout())
+                .build();
+
+        // Shares the dispatcher + connection pool; only flips retryOnConnectionFailure.
+        phishingClient = client.newBuilder()
+                .retryOnConnectionFailure(true)
                 .build();
     }
 
@@ -170,7 +179,7 @@ public class Botbye {
             return new BotbyePhishingResponse(0, Collections.emptyMap(), new byte[0], new BotbyeError("[BotBye] phishing is not configured"));
         }
 
-        String baseUrl = conf.getEndpoint() + "/api/v1/phishing/" + conf.getAccountId() + "/projects/" + conf.getProjectId() + "/image";
+        String baseUrl = conf.getEndpoint() + "/api/v1/phishing/image/" + conf.getClientKey();
         HttpUrl url = HttpUrl.parse(baseUrl);
         if (url == null) {
             return new BotbyePhishingResponse(0, Collections.emptyMap(), new byte[0], new BotbyeError("[BotBye] invalid phishing endpoint url"));
@@ -191,11 +200,10 @@ public class Botbye {
         Request request = new Request.Builder()
                 .url(finalUrl)
                 .get()
-                .addHeader("X-Api-Key", conf.getApiKey())
                 .addHeader("Origin", origin != null ? origin : "origin is missing")
                 .build();
 
-        try (Response response = client.newCall(request).execute()) {
+        try (Response response = phishingClient.newCall(request).execute()) {
             Map<String, String> headers = new HashMap<>();
             for (String name : response.headers().names()) {
                 headers.put(name, response.header(name));
@@ -206,7 +214,7 @@ public class Botbye {
             return new BotbyePhishingResponse(response.code(), headers, bytes);
         } catch (Exception e) {
             LOGGER.warning("[BotBye] phishing image exception occurred: " + e.getMessage());
-            return new BotbyePhishingResponse(0, Collections.emptyMap(), new byte[0], new BotbyeError(e.getMessage() != null ? e.getMessage() : "[BotBye] failed to fetch phishing image"));
+            return new BotbyePhishingResponse(0, Collections.emptyMap(), new byte[0], new BotbyeError(classifyError(e)));
         }
     }
 
