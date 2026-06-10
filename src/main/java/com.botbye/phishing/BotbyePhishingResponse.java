@@ -1,5 +1,6 @@
-package com.botbye.model;
+package com.botbye.phishing;
 
+import com.botbye.common.BotbyeError;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collections;

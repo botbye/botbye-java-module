@@ -1,4 +1,6 @@
-package com.botbye.model;
+package com.botbye.protection.model;
+
+import com.botbye.common.BotbyeError;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;

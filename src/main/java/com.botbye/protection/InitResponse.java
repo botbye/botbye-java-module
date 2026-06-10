@@ -1,4 +1,4 @@
-package com.botbye.model;
+package com.botbye.protection;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.Serializable;

@@ -1,12 +1,14 @@
-package com.botbye.model;
+package com.botbye.protection;
 
+import static com.botbye.common.UrlUtils.normalizeBaseUrl;
+import static com.botbye.common.UrlUtils.requireNonBlank;
 import java.io.Serializable;
 import java.time.Duration;
 import java.util.Objects;
 import okhttp3.MediaType;
 
 public class BotbyeConfig implements Serializable {
-    private static final String MODULE_VERSION = "2.1.0";
+    private static final String MODULE_VERSION = "3.0.0";
     private static final String MODULE_NAME = "Java";
 
     private static final String DEFAULT_BOTBYE_ENDPOINT = "https://verify.botbye.com";
@@ -122,17 +124,6 @@ public class BotbyeConfig implements Serializable {
             config.contentType = this.contentType;
             return config;
         }
-    }
-
-    public static String normalizeBaseUrl(String url) {
-        return url.replaceAll("/+$", "");
-    }
-
-    private static String requireNonBlank(String value, String fieldName) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException("[BotBye] " + fieldName + " is not specified");
-        }
-        return value;
     }
 
     public static String getModuleName() {

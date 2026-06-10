@@ -1,4 +1,4 @@
-package com.botbye.model;
+package com.botbye.protection;
 
 import java.io.Serializable;
 

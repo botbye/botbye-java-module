@@ -1,4 +1,4 @@
-package com.botbye.model;
+package com.botbye.protection.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSubTypes;

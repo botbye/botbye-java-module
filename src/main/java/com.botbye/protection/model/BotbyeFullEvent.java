@@ -1,4 +1,6 @@
-package com.botbye.model;
+package com.botbye.protection.model;
+
+import com.botbye.protection.BotbyeConfig;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -10,14 +12,14 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * Level 2: Risk evaluation (middleware, post-authentication).
- * Evaluates ATO/abuse risk using user context and dynamic metrics.
- * Bot score comes from Level 1 result ({@code botbyeResult}).
+ * Combined Level 1+2: Bot validation + risk evaluation in a single call.
+ * Use when there is no separate proxy — the middleware validates the token
+ * and evaluates ATO/abuse risk in one request.
  */
 @JsonAppend(attrs = {@JsonAppend.Attr(value = "server_key")})
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public final class BotbyeRiskScoringEvent implements BotbyeEvent, Serializable {
+public final class BotbyeFullEvent implements BotbyeEvent, Serializable {
     private static final BotbyeIntegrationInfo INTEGRATION = new BotbyeIntegrationInfo(
         BotbyeConfig.getModuleName(), BotbyeConfig.getModuleVersion()
     );
@@ -26,49 +28,46 @@ public final class BotbyeRiskScoringEvent implements BotbyeEvent, Serializable {
     private final BotbyeRequestInfo request;
     private final BotbyeEventInfo event;
     private final BotbyeUserInfo user;
-    private final String botbyeResult;
     private final Map<String, String> customFields;
 
-    public BotbyeRiskScoringEvent(
+    public BotbyeFullEvent(
             BotbyeRequestInfo request,
             BotbyeEventInfo event,
             BotbyeUserInfo user,
-            String botbyeResult,
             Map<String, String> customFields
     ) {
         this.request = request;
         this.event = event;
         this.user = user;
-        this.botbyeResult = botbyeResult;
         this.customFields = customFields;
     }
 
-    public static BotbyeRiskScoringEvent of(
+    public static BotbyeFullEvent of(
             String ip,
+            String token,
             Map<String, String> headers,
             BotbyeUserInfo user,
             String eventType,
             BotbyeEventStatus eventStatus
     ) {
-        return of(ip, headers, user, eventType, eventStatus, null, Collections.emptyMap());
+        return of(ip, token, headers, user, eventType, eventStatus, null, null, Collections.emptyMap());
     }
 
-    public static BotbyeRiskScoringEvent of(
+    public static BotbyeFullEvent of(
             String ip,
+            String token,
             Map<String, String> headers,
             BotbyeUserInfo user,
             String eventType,
             BotbyeEventStatus eventStatus,
-            String botbyeResult,
+            String requestMethod,
+            String requestUri,
             Map<String, String> customFields
     ) {
-        boolean hasResult = botbyeResult != null && !botbyeResult.isBlank();
-
-        return new BotbyeRiskScoringEvent(
-            new BotbyeRequestInfo(ip, headers),
+        return new BotbyeFullEvent(
+            new BotbyeRequestInfo(ip, token, headers, requestMethod, requestUri),
             new BotbyeEventInfo(eventType, eventStatus),
             user,
-            hasResult ? botbyeResult : null,
             customFields != null ? customFields : Collections.emptyMap()
         );
     }
@@ -76,7 +75,7 @@ public final class BotbyeRiskScoringEvent implements BotbyeEvent, Serializable {
     @Override
     @JsonIgnore
     public String getUrlToken() {
-        return null;
+        return request.getToken();
     }
 
     public BotbyeIntegrationInfo getIntegration() {
@@ -93,10 +92,6 @@ public final class BotbyeRiskScoringEvent implements BotbyeEvent, Serializable {
 
     public BotbyeUserInfo getUser() {
         return user;
-    }
-
-    public String getBotbyeResult() {
-        return botbyeResult;
     }
 
     public Map<String, String> getCustomFields() {

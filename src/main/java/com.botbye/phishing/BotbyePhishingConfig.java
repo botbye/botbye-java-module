@@ -1,6 +1,6 @@
-package com.botbye.model;
+package com.botbye.phishing;
 
-import static com.botbye.model.BotbyeConfig.normalizeBaseUrl;
+import static com.botbye.common.UrlUtils.normalizeBaseUrl;
 import java.io.Serializable;
 import java.util.Objects;
 

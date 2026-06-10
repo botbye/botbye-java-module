@@ -1,4 +1,4 @@
-package com.botbye.model;
+package com.botbye.common;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
