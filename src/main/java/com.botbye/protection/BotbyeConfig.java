@@ -8,9 +8,6 @@ import java.util.Objects;
 import okhttp3.MediaType;
 
 public class BotbyeConfig implements Serializable {
-    private static final String MODULE_VERSION = "3.0.0";
-    private static final String MODULE_NAME = "Java";
-
     private static final String DEFAULT_BOTBYE_ENDPOINT = "https://verify.botbye.com";
     private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(2);
     private static final Duration DEFAULT_WRITE_TIMEOUT = Duration.ofSeconds(2);
@@ -124,14 +121,6 @@ public class BotbyeConfig implements Serializable {
             config.contentType = this.contentType;
             return config;
         }
-    }
-
-    public static String getModuleName() {
-        return MODULE_NAME;
-    }
-
-    public static String getModuleVersion() {
-        return MODULE_VERSION;
     }
 
     public String getBotbyeEndpoint() {

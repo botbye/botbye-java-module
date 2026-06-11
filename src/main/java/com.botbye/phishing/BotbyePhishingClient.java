@@ -2,6 +2,7 @@ package com.botbye.phishing;
 
 import com.botbye.common.BotbyeError;
 import com.botbye.common.ErrorClassifier;
+import com.botbye.common.ModuleInfo;
 import com.botbye.common.OkHttpClients;
 import java.time.Duration;
 import java.util.Collections;
@@ -91,6 +92,8 @@ public class BotbyePhishingClient {
                 .url(finalUrl)
                 .get()
                 .addHeader("Origin", origin != null ? origin : "origin is missing")
+                .addHeader("Module-Name", ModuleInfo.NAME)
+                .addHeader("Module-Version", ModuleInfo.VERSION)
                 .build();
 
         try (Response response = client.newCall(request).execute()) {

@@ -1,6 +1,6 @@
 package com.botbye.protection.model;
 
-import com.botbye.protection.BotbyeConfig;
+import com.botbye.common.ModuleInfo;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -21,7 +21,7 @@ import java.util.Map;
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public final class BotbyeRiskScoringEvent implements BotbyeEvent, Serializable {
     private static final BotbyeIntegrationInfo INTEGRATION = new BotbyeIntegrationInfo(
-        BotbyeConfig.getModuleName(), BotbyeConfig.getModuleVersion()
+        ModuleInfo.NAME, ModuleInfo.VERSION
     );
 
     private final BotbyeIntegrationInfo integration = INTEGRATION;

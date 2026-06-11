@@ -2,6 +2,7 @@ package com.botbye.protection;
 
 import com.botbye.common.BotbyeError;
 import com.botbye.common.ErrorClassifier;
+import com.botbye.common.ModuleInfo;
 import com.botbye.common.OkHttpClients;
 import com.botbye.protection.model.BotbyeEvaluateResponse;
 import com.botbye.protection.model.BotbyeEvent;
@@ -119,8 +120,8 @@ public class Botbye {
             Request request = new Request.Builder()
                     .url(url)
                     .post(RequestBody.create(mapper.writeValueAsBytes(initBody), botbyeConfig.getContentType()))
-                    .header("Module-Name", BotbyeConfig.getModuleName())
-                    .header("Module-Version", BotbyeConfig.getModuleVersion())
+                    .header("Module-Name", ModuleInfo.NAME)
+                    .header("Module-Version", ModuleInfo.VERSION)
                     .header("X-Botbye-Server-Key", botbyeConfig.getServerKey())
                     .build();
 
@@ -157,8 +158,8 @@ public class Botbye {
         return new Request.Builder()
                 .url(url)
                 .post(RequestBody.create(writer.writeValueAsBytes(event), botbyeConfig.getContentType()))
-                .header("Module-Name", BotbyeConfig.getModuleName())
-                .header("Module-Version", BotbyeConfig.getModuleVersion())
+                .header("Module-Name", ModuleInfo.NAME)
+                .header("Module-Version", ModuleInfo.VERSION)
                 .build();
     }
 
