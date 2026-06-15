@@ -3,33 +3,41 @@ package com.botbye.phishing;
 import com.botbye.common.BotbyeError;
 import com.botbye.common.ErrorClassifier;
 import com.botbye.common.ModuleInfo;
-import com.botbye.common.OkHttpClients;
-import java.time.Duration;
+import com.botbye.common.http.BotbyeHttpClient;
+import com.botbye.common.http.BotbyeHttpRequest;
+import com.botbye.common.http.BotbyeHttpResponse;
+import com.botbye.common.http.OkHttpBotbyeClient;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import okhttp3.HttpUrl;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
 
 /**
  * Phishing-only client. Authenticates with the public {@link BotbyePhishingConfig#getClientKey()}
  * embedded in the URL path — it needs no server key, so it can be constructed independently of the
- * evaluate {@code com.botbye.Botbye} client.
+ * evaluate {@code com.botbye.protection.Botbye} client.
  *
  * <p>On construction it fires a best-effort server-integration init handshake
  * ({@code POST /api/v1/phishing/init-request/v1/{clientKey}}), reporting this module via the
  * {@code Module-Name} / {@code Module-Version} headers. {@link #fetchImage} fetches the tracking
  * pixel server-side via the {@code /server} route, so the backend can attribute it to this module
  * even when the browser never reaches BotBye directly (the SDK proxies the image).
+ *
+ * <p>Two construction modes:
+ * <ul>
+ *   <li>{@code new BotbyePhishingClient(config)} — pass the {@code Origin} header to
+ *       {@link #fetchImage(String)} yourself.</li>
+ *   <li>{@link #withExtractor} — binds a {@link BotbyePhishingRequestExtractor} of framework request
+ *       type {@code R} so callers pass only their raw request to {@link #fetchImage(Object)}.</li>
+ * </ul>
+ *
+ * @param <R> framework request type for the raw-request {@code fetchImage} methods.
  */
-public class BotbyePhishingClient {
+public class BotbyePhishingClient<R> {
     private static final Logger LOGGER = Logger.getLogger(BotbyePhishingClient.class.getName());
 
     static {
@@ -38,30 +46,40 @@ public class BotbyePhishingClient {
     }
 
     private BotbyePhishingConfig config;
-    // Phishing fetchImage is an idempotent GET, so the client retries on connection failure: a stale
-    // pooled keep-alive connection (closed by the server while idle) is transparently re-established
-    // instead of failing with "unexpected end of stream".
-    private final OkHttpClient client;
+    private final BotbyeHttpClient client;
+    private final BotbyePhishingRequestExtractor<R> extractor;
 
-    public BotbyePhishingClient(BotbyePhishingConfig config) {
+    private BotbyePhishingClient(BotbyePhishingConfig config, BotbyeHttpClient client, BotbyePhishingRequestExtractor<R> extractor) {
         if (config == null) {
             throw new IllegalStateException("[BotBye] phishing config is not specified");
         }
+        if (client == null) {
+            throw new IllegalStateException("[BotBye] http client is not specified");
+        }
 
         this.config = config;
-        this.client = OkHttpClients.create(
-                1500,
-                1500,
-                250,
-                Duration.ofSeconds(300),
-                Duration.ofSeconds(2),
-                Duration.ofSeconds(2),
-                Duration.ofSeconds(2),
-                Duration.ofSeconds(5),
-                true
-        );
+        this.client = client;
+        this.extractor = extractor;
 
         initRequest();
+    }
+
+    public BotbyePhishingClient(BotbyePhishingConfig config) {
+        this(config, OkHttpBotbyeClient.forPhishing(), null);
+    }
+
+    public BotbyePhishingClient(BotbyePhishingConfig config, BotbyeHttpClient client) {
+        this(config, client, null);
+    }
+
+    /** Factory for framework SDKs: bind an Origin extractor and use the default OkHttp transport. */
+    public static <R> BotbyePhishingClient<R> withExtractor(BotbyePhishingConfig config, BotbyePhishingRequestExtractor<R> extractor) {
+        return new BotbyePhishingClient<>(config, OkHttpBotbyeClient.forPhishing(), extractor);
+    }
+
+    /** Factory for framework SDKs: bind an Origin extractor and a custom transport. */
+    public static <R> BotbyePhishingClient<R> withExtractor(BotbyePhishingConfig config, BotbyePhishingRequestExtractor<R> extractor, BotbyeHttpClient client) {
+        return new BotbyePhishingClient<>(config, client, extractor);
     }
 
     public void setConf(BotbyePhishingConfig config) {
@@ -72,52 +90,51 @@ public class BotbyePhishingClient {
         this.config = config;
     }
 
+    /** Fetch the tracking pixel using an explicit {@code Origin} header value (PNG). */
     public BotbyePhishingResponse fetchImage(String origin) {
-        return fetchImage(origin, null);
+        return fetchImage(origin, (String) null);
     }
 
+    /** Fetch the tracking pixel using an explicit {@code Origin} header value. */
     public BotbyePhishingResponse fetchImage(String origin, String imageId) {
-        BotbyePhishingConfig conf = config;
+        String url = buildImageUrl(config, imageId);
 
-        String baseUrl = conf.getEndpoint() + "/api/v1/phishing/image/" + conf.getClientKey() + "/server";
-        HttpUrl url = HttpUrl.parse(baseUrl);
-        if (url == null) {
-            return new BotbyePhishingResponse(0, Collections.emptyMap(), new byte[0], new BotbyeError("[BotBye] invalid phishing endpoint url"));
-        }
+        Map<String, String> headers = moduleHeaders();
+        headers.put("Origin", origin != null ? origin : "origin is missing");
 
-        HttpUrl finalUrl;
-        if (imageId == null || imageId.isBlank()) {
-            finalUrl = url.newBuilder()
-                    .addQueryParameter("format", "png")
-                    .build();
-        } else {
-            finalUrl = url.newBuilder()
-                    .addQueryParameter("image_id", imageId)
-                    .addQueryParameter("format", "svg")
-                    .build();
-        }
+        try {
+            BotbyeHttpResponse response = client.call(new BotbyeHttpRequest(url, "GET", headers, null, null));
 
-        Request request = new Request.Builder()
-                .url(finalUrl)
-                .get()
-                .addHeader("Origin", origin != null ? origin : "origin is missing")
-                .addHeader("Module-Name", ModuleInfo.NAME)
-                .addHeader("Module-Version", ModuleInfo.VERSION)
-                .build();
-
-        try (Response response = client.newCall(request).execute()) {
-            Map<String, String> headers = new HashMap<>();
-            for (String name : response.headers().names()) {
-                headers.put(name, response.header(name));
-            }
-            ResponseBody body = response.body();
-            byte[] bytes = body == null ? new byte[0] : body.bytes();
-
-            return new BotbyePhishingResponse(response.code(), headers, bytes);
+            return new BotbyePhishingResponse(response.getStatus(), response.getHeaders(), response.getBody());
         } catch (Exception e) {
             LOGGER.warning("[BotBye] phishing image exception occurred: " + e.getMessage());
             return new BotbyePhishingResponse(0, Collections.emptyMap(), new byte[0], new BotbyeError(ErrorClassifier.classify(e)));
         }
+    }
+
+    /** Fetch the tracking pixel from a raw framework request (requires {@link #withExtractor}). */
+    public BotbyePhishingResponse fetchImage(R request) {
+        return fetchImage(request, null);
+    }
+
+    /** Fetch the tracking pixel from a raw framework request (requires {@link #withExtractor}). */
+    public BotbyePhishingResponse fetchImage(R request, String imageId) {
+        if (extractor == null) {
+            throw new IllegalStateException(
+                    "[BotBye] no phishing extractor configured; use BotbyePhishingClient.withExtractor(...) to fetch from a raw request");
+        }
+
+        return fetchImage(extractor.extractOrigin(request), imageId);
+    }
+
+    private static String buildImageUrl(BotbyePhishingConfig conf, String imageId) {
+        String baseUrl = conf.getEndpoint() + "/api/v1/phishing/image/" + conf.getClientKey() + "/server";
+
+        if (imageId == null || imageId.isBlank()) {
+            return baseUrl + "?format=png";
+        }
+
+        return baseUrl + "?image_id=" + URLEncoder.encode(imageId, StandardCharsets.UTF_8) + "&format=svg";
     }
 
     /**
@@ -130,20 +147,19 @@ public class BotbyePhishingClient {
             String url = config.getEndpoint().replaceAll("/+$", "")
                     + "/api/v1/phishing/init-request/v1/" + config.getClientKey();
 
-            Request request = new Request.Builder()
-                    .url(url)
-                    .post(RequestBody.create(new byte[0], null))
-                    .header("Module-Name", ModuleInfo.NAME)
-                    .header("Module-Version", ModuleInfo.VERSION)
-                    .build();
-
-            try (Response response = client.newCall(request).execute()) {
-                if (!response.isSuccessful()) {
-                    LOGGER.warning("[BotBye] phishing init-request returned HTTP " + response.code());
-                }
+            BotbyeHttpResponse response = client.call(new BotbyeHttpRequest(url, "POST", moduleHeaders(), new byte[0], null));
+            if (response.getStatus() < 200 || response.getStatus() >= 300) {
+                LOGGER.warning("[BotBye] phishing init-request returned HTTP " + response.getStatus());
             }
         } catch (Exception e) {
             LOGGER.warning("[BotBye] phishing init-request exception: " + e.getMessage());
         }
+    }
+
+    private Map<String, String> moduleHeaders() {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Module-Name", ModuleInfo.NAME);
+        headers.put("Module-Version", ModuleInfo.VERSION);
+        return headers;
     }
 }

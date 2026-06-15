@@ -308,49 +308,75 @@ if (response.getError() != null) {
 }
 ```
 
-## Framework Integration
+## Request Extractors (framework integration)
+
+Instead of building events field-by-field at every call site, describe **once** how to turn your
+framework's request object into a `BotbyeRequestInfo`, then pass only the raw request to the
+`evaluate*` methods. Build the client with `Botbye.withExtractor(...)` — the type parameter is your
+framework request type:
+
+```java
+import com.botbye.protection.Botbye;
+import com.botbye.protection.model.BotbyeRequestInfo;
+import jakarta.servlet.http.HttpServletRequest;
+
+Botbye<HttpServletRequest> botbye = Botbye.withExtractor(config, request -> {
+    Map<String, String> headers = Collections.list(request.getHeaderNames()).stream()
+        .collect(Collectors.toMap(h -> h, request::getHeader));
+
+    return new BotbyeRequestInfo(
+        request.getRemoteAddr(),
+        request.getParameter("botbye_token"),
+        headers,
+        request.getMethod(),
+        request.getRequestURI()
+    );
+});
+```
+
+Now the call sites only pass the raw request (plus user/event for Level 2):
+
+```java
+import com.botbye.protection.model.BotbyeEventStatus;
+import com.botbye.protection.model.BotbyeUserInfo;
+
+// Level 1 — bot validation
+BotbyeEvaluateResponse l1 = botbye.evaluateValidation(request);
+
+// Level 2 — risk scoring & event logging
+BotbyeEvaluateResponse l2 = botbye.evaluateRiskScoring(
+    request,
+    new BotbyeUserInfo(userId),
+    "LOGIN",
+    BotbyeEventStatus.SUCCESSFUL,
+    null,                       // token override (null = use extractor's)
+    l1.getBotbyeResult(),
+    Collections.emptyMap()
+);
+
+// Level 1+2 combined (no separate proxy)
+BotbyeEvaluateResponse full = botbye.evaluateFull(request, new BotbyeUserInfo(userId), "LOGIN", BotbyeEventStatus.FAILED);
+```
+
+An explicit `token` argument overrides the one returned by the extractor. The
+`HeaderUtils.getIpFromHeaders(headers)` helper is handy inside extractors when the IP lives behind a
+proxy.
 
 ### Spring Boot Filter
 
 ```java
-import com.botbye.protection.Botbye;
-import com.botbye.protection.model.BotbyeValidationEvent;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
-import java.io.IOException;
-import java.util.Collections;
-
 @Component
 public class BotbyeFilter extends OncePerRequestFilter {
-    private final Botbye botbye;
+    private final Botbye<HttpServletRequest> botbye;
 
-    public BotbyeFilter(Botbye botbye) {
+    public BotbyeFilter(Botbye<HttpServletRequest> botbye) {
         this.botbye = botbye;
     }
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
-    ) throws ServletException, IOException {
-        Map<String, String> headers = Collections.list(request.getHeaderNames()).stream()
-            .collect(Collectors.toMap(h -> h, request::getHeader));
-
-        var result = botbye.evaluate(BotbyeValidationEvent.of(
-            request.getRemoteAddr(),
-            request.getParameter("botbye_token"),
-            headers,
-            request.getMethod(),
-            request.getRequestURI(),
-            Collections.emptyMap()
-        ));
-
-        if (result.isBlocked()) {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+        if (botbye.evaluateValidation(request).isBlocked()) {
             response.setStatus(403);
             return;
         }
@@ -359,6 +385,37 @@ public class BotbyeFilter extends OncePerRequestFilter {
     }
 }
 ```
+
+> The explicit-event API is always available too: `new Botbye(config)` gives a client on which you
+> call `evaluate(BotbyeValidationEvent.of(...))` etc. with no extractor.
+
+## Custom HTTP Transport
+
+The SDK depends only on the `BotbyeHttpClient` interface; OkHttp is the default
+(`OkHttpBotbyeClient`). To run on a different HTTP stack, implement the interface and pass it to the
+client constructor / factory:
+
+```java
+import com.botbye.common.http.BotbyeHttpClient;
+import com.botbye.common.http.BotbyeHttpRequest;
+import com.botbye.common.http.BotbyeHttpResponse;
+
+class MyHttpClient implements BotbyeHttpClient {
+    public String type() { return "my-client"; }
+    public BotbyeHttpResponse call(BotbyeHttpRequest request) throws IOException { /* ... */ }
+    public CompletableFuture<BotbyeHttpResponse> callAsync(BotbyeHttpRequest request) { /* ... */ }
+}
+
+Botbye botbye = new Botbye(config, new MyHttpClient());
+```
+
+## Helpers
+
+| Helper | Description |
+|---|---|
+| `HeaderUtils.getIpFromHeaders(headers)` | Extract the client IP from headers (`x-forwarded-for` first hop, then `x-real-ip`). |
+| `FallbackEvaluationResult.create(message)` | Build a fail-open `BotbyeEvaluateResponse` (`ALLOW` + `error`) for your own short-circuit paths. |
+| `BotbyeErrors` | Normalized error message constants: `SDK_ERROR`, `UNKNOWN_ERROR`, `TIMEOUT_ERROR`, `CONNECTION_ERROR`, `JSON_ERROR`. |
 
 ## Testing
 

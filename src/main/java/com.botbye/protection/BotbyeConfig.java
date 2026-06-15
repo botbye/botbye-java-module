@@ -5,7 +5,6 @@ import static com.botbye.common.UrlUtils.requireNonBlank;
 import java.io.Serializable;
 import java.time.Duration;
 import java.util.Objects;
-import okhttp3.MediaType;
 
 public class BotbyeConfig implements Serializable {
     private static final String DEFAULT_BOTBYE_ENDPOINT = "https://verify.botbye.com";
@@ -17,11 +16,11 @@ public class BotbyeConfig implements Serializable {
     private static final Duration DEFAULT_KEEP_ALIVE_DURATION = Duration.ofSeconds(300);
     private static final int DEFAULT_MAX_REQUESTS_PER_HOST = 1500;
     private static final int DEFAULT_MAX_REQUESTS = 1500;
-    private static final MediaType DEFAULT_CONTENT_TYPE = MediaType.parse("application/json");
+    private static final String DEFAULT_CONTENT_TYPE = "application/json";
 
     private String botbyeEndpoint;
     private String serverKey;
-    private MediaType contentType;
+    private String contentType;
     // client config
     private Duration readTimeout;
     private Duration writeTimeout;
@@ -48,7 +47,7 @@ public class BotbyeConfig implements Serializable {
         private Duration keepAliveDuration = DEFAULT_KEEP_ALIVE_DURATION;
         private int maxRequestsPerHost = DEFAULT_MAX_REQUESTS_PER_HOST;
         private int maxRequests = DEFAULT_MAX_REQUESTS;
-        private MediaType contentType = DEFAULT_CONTENT_TYPE;
+        private String contentType = DEFAULT_CONTENT_TYPE;
 
         public Builder botbyeEndpoint(String botbyeEndpoint) {
             this.botbyeEndpoint = botbyeEndpoint;
@@ -101,7 +100,7 @@ public class BotbyeConfig implements Serializable {
             return this;
         }
 
-        public Builder contentType(MediaType contentType) {
+        public Builder contentType(String contentType) {
             this.contentType = contentType;
             return this;
         }
@@ -132,7 +131,7 @@ public class BotbyeConfig implements Serializable {
     }
 
 
-    public MediaType getContentType() {
+    public String getContentType() {
         return contentType;
     }
 

@@ -1,4 +1,4 @@
-package com.botbye.common;
+package com.botbye.common.http;
 
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
@@ -6,6 +6,7 @@ import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
 import okhttp3.OkHttpClient;
 
+/** Builds a configured {@link OkHttpClient}. OkHttp is confined to the {@code common.http} package. */
 public final class OkHttpClients {
     private OkHttpClients() {
     }
