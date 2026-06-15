@@ -14,13 +14,20 @@ import java.util.logging.Logger;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 
 /**
  * Phishing-only client. Authenticates with the public {@link BotbyePhishingConfig#getClientKey()}
- * embedded in the URL path — it needs no server key and performs no init handshake, so it can be
- * constructed independently of the evaluate {@code com.botbye.Botbye} client.
+ * embedded in the URL path — it needs no server key, so it can be constructed independently of the
+ * evaluate {@code com.botbye.Botbye} client.
+ *
+ * <p>On construction it fires a best-effort server-integration init handshake
+ * ({@code POST /api/v1/phishing/init-request/v1/{clientKey}}), reporting this module via the
+ * {@code Module-Name} / {@code Module-Version} headers. {@link #fetchImage} fetches the tracking
+ * pixel server-side via the {@code /server} route, so the backend can attribute it to this module
+ * even when the browser never reaches BotBye directly (the SDK proxies the image).
  */
 public class BotbyePhishingClient {
     private static final Logger LOGGER = Logger.getLogger(BotbyePhishingClient.class.getName());
@@ -53,6 +60,8 @@ public class BotbyePhishingClient {
                 Duration.ofSeconds(5),
                 true
         );
+
+        initRequest();
     }
 
     public void setConf(BotbyePhishingConfig config) {
@@ -70,7 +79,7 @@ public class BotbyePhishingClient {
     public BotbyePhishingResponse fetchImage(String origin, String imageId) {
         BotbyePhishingConfig conf = config;
 
-        String baseUrl = conf.getEndpoint() + "/api/v1/phishing/image/" + conf.getClientKey();
+        String baseUrl = conf.getEndpoint() + "/api/v1/phishing/image/" + conf.getClientKey() + "/server";
         HttpUrl url = HttpUrl.parse(baseUrl);
         if (url == null) {
             return new BotbyePhishingResponse(0, Collections.emptyMap(), new byte[0], new BotbyeError("[BotBye] invalid phishing endpoint url"));
@@ -108,6 +117,33 @@ public class BotbyePhishingClient {
         } catch (Exception e) {
             LOGGER.warning("[BotBye] phishing image exception occurred: " + e.getMessage());
             return new BotbyePhishingResponse(0, Collections.emptyMap(), new byte[0], new BotbyeError(ErrorClassifier.classify(e)));
+        }
+    }
+
+    /**
+     * Reports the server-side phishing integration to the backend (the {@code SERVER_INTEGRATION_INIT}
+     * get-started milestone). Best-effort: any failure is logged and swallowed, mirroring the evaluate
+     * client's init handshake, so it never blocks or breaks the customer's startup.
+     */
+    private void initRequest() {
+        try {
+            String url = config.getEndpoint().replaceAll("/+$", "")
+                    + "/api/v1/phishing/init-request/v1/" + config.getClientKey();
+
+            Request request = new Request.Builder()
+                    .url(url)
+                    .post(RequestBody.create(new byte[0], null))
+                    .header("Module-Name", ModuleInfo.NAME)
+                    .header("Module-Version", ModuleInfo.VERSION)
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    LOGGER.warning("[BotBye] phishing init-request returned HTTP " + response.code());
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.warning("[BotBye] phishing init-request exception: " + e.getMessage());
         }
     }
 }
