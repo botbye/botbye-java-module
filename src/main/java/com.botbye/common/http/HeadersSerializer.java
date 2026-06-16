@@ -16,10 +16,18 @@ public final class HeadersSerializer extends JsonSerializer<Headers> {
     @Override
     public void serialize(Headers value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
         gen.writeStartObject();
-        for (Map.Entry<String, List<String>> entry : value.getHeaders().entrySet()) {
-            List<String> values = entry.getValue();
-            String joined = values.size() == 1 ? values.get(0) : String.join(", ", values);
-            gen.writeStringField(entry.getKey().toLowerCase(Locale.ROOT), joined);
+        Map<String, List<String>> headers = value.getHeaders();
+        if (headers != null) {
+            for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+                if (entry.getKey() == null) {
+                    continue;
+                }
+                List<String> values = entry.getValue();
+                String joined = values == null || values.isEmpty()
+                        ? ""
+                        : values.size() == 1 ? values.get(0) : String.join(", ", values);
+                gen.writeStringField(entry.getKey().toLowerCase(Locale.ROOT), joined);
+            }
         }
         gen.writeEndObject();
     }

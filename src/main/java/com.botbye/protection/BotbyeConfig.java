@@ -180,11 +180,16 @@ public class BotbyeConfig implements Serializable {
         return Objects.hash(botbyeEndpoint, serverKey, contentType, readTimeout, writeTimeout, connectionTimeout, callTimeout, maxIdleConnections, keepAliveDuration, maxRequestsPerHost, maxRequests);
     }
 
+    /** Masks the secret so {@code toString()} / log dumps never leak the server key. */
+    private static String maskSecret(String secret) {
+        return secret == null ? "null" : "***";
+    }
+
     @Override
     public String toString() {
         return "BotbyeConfig{" +
                 "botbyeEndpoint='" + botbyeEndpoint + '\'' +
-                ", serverKey='" + serverKey + '\'' +
+                ", serverKey='" + maskSecret(serverKey) + '\'' +
                 ", contentType=" + contentType +
                 ", readTimeout=" + readTimeout +
                 ", writeTimeout=" + writeTimeout +

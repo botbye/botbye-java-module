@@ -13,8 +13,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -39,12 +37,9 @@ import java.util.logging.Logger;
  * @param <R> framework request type for the raw-request {@code fetchImage} methods.
  */
 public class BotbyePhishingClient<R> implements Closeable {
+    // A library must not install handlers or set levels on the JUL logger — that is the host
+    // application's responsibility (see the note in com.botbye.protection.Botbye).
     private static final Logger LOGGER = Logger.getLogger(BotbyePhishingClient.class.getName());
-
-    static {
-        LOGGER.setLevel(Level.WARNING);
-        LOGGER.addHandler(new ConsoleHandler());
-    }
 
     private static final Map<String, String> MODULE_HEADERS = Map.of(
             "Module-Name", ModuleInfo.NAME,

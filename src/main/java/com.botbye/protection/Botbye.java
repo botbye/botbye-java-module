@@ -26,8 +26,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -48,12 +46,10 @@ import java.util.logging.Logger;
  *            no extractor is configured.
  */
 public class Botbye<R> implements BotbyeEvaluator, Closeable {
+    // A library must not install handlers or set levels on the JUL logger — that is the host
+    // application's responsibility. Adding a ConsoleHandler here also duplicates output (own handler +
+    // inherited parent handlers) and forces JUL even when the host routes through SLF4J/Logback.
     private static final Logger LOGGER = Logger.getLogger(Botbye.class.getName());
-
-    static {
-        LOGGER.setLevel(Level.WARNING);
-        LOGGER.addHandler(new ConsoleHandler());
-    }
 
     private static final Map<String, String> MODULE_HEADERS = Map.of(
             "Module-Name", ModuleInfo.NAME,
@@ -245,8 +241,15 @@ public class Botbye<R> implements BotbyeEvaluator, Closeable {
     }
 
     private BotbyeEvaluateResponse handleEvaluateResponse(BotbyeHttpResponse response) {
-        if (response.getStatus() >= 500) {
+        int status = response.getStatus();
+        if (status >= 500) {
+            LOGGER.warning("[BotBye] evaluate returned HTTP " + status + "; failing open");
             return FallbackEvaluationResult.create(BotbyeErrors.CONNECTION_ERROR);
+        }
+        // 4xx (e.g. 401 bad server key, 400 bad request) still fails open, but must not be silent —
+        // otherwise a misconfigured key disables protection with no operational signal.
+        if (status >= 400) {
+            LOGGER.warning("[BotBye] evaluate returned HTTP " + status + "; check server key / request");
         }
         if (response.getBody().length == 0) {
             return new BotbyeEvaluateResponse();
