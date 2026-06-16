@@ -163,30 +163,57 @@ public class Botbye<R> implements BotbyeEvaluator, Closeable {
 
     /** Level 1 bot validation from a raw framework request (requires {@link #withExtractor}). */
     public BotbyeEvaluateResponse evaluateValidation(R request, String token, Map<String, String> customFields) {
-        BotbyeRequestInfo info = withToken(requireExtractor().extract(request), token);
+        return evaluate(validationEvent(request, token, customFields));
+    }
 
-        return evaluate(new BotbyeValidationEvent(info, orEmpty(customFields)));
+    /** Asynchronous variant of {@link #evaluateValidation(Object)}. */
+    public CompletableFuture<BotbyeEvaluateResponse> evaluateValidationAsync(R request) {
+        return evaluateValidationAsync(request, null, null);
+    }
+
+    /** Asynchronous variant of {@link #evaluateValidation(Object, String, Map)}. */
+    public CompletableFuture<BotbyeEvaluateResponse> evaluateValidationAsync(R request, String token, Map<String, String> customFields) {
+        return evaluateAsync(validationEvent(request, token, customFields));
     }
 
     /** Level 2 risk evaluation from a raw framework request (requires {@link #withExtractor}). */
     public BotbyeEvaluateResponse evaluateRiskScoring(R request, BotbyeUserInfo user, String eventType, BotbyeEventStatus eventStatus) {
-        return evaluateRiskScoring(request, user, eventType, eventStatus, null, null, null);
+        return evaluateRiskScoring(request, user, eventType, eventStatus, null, null);
     }
 
-    /** Level 2 risk evaluation from a raw framework request (requires {@link #withExtractor}). */
+    /**
+     * Level 2 risk evaluation from a raw framework request (requires {@link #withExtractor}).
+     *
+     * <p>No device {@code token} parameter by design: Level 2 is post-authentication and links to
+     * Level 1 via {@code botbyeResult}, not a raw token. If you have both a token and user/event
+     * context, that is a combined Level 1+2 call — use {@link #evaluateFull}.
+     */
     public BotbyeEvaluateResponse evaluateRiskScoring(
             R request,
             BotbyeUserInfo user,
             String eventType,
             BotbyeEventStatus eventStatus,
-            String token,
             String botbyeResult,
             Map<String, String> customFields
     ) {
-        BotbyeRequestInfo info = withToken(requireExtractor().extract(request), token);
-        String result = botbyeResult != null && !botbyeResult.isBlank() ? botbyeResult : null;
+        return evaluate(riskScoringEvent(request, user, eventType, eventStatus, botbyeResult, customFields));
+    }
 
-        return evaluate(new BotbyeRiskScoringEvent(info, new BotbyeEventInfo(eventType, eventStatus), user, result, orEmpty(customFields)));
+    /** Asynchronous variant of {@link #evaluateRiskScoring(Object, BotbyeUserInfo, String, BotbyeEventStatus)}. */
+    public CompletableFuture<BotbyeEvaluateResponse> evaluateRiskScoringAsync(R request, BotbyeUserInfo user, String eventType, BotbyeEventStatus eventStatus) {
+        return evaluateRiskScoringAsync(request, user, eventType, eventStatus, null, null);
+    }
+
+    /** Asynchronous variant of {@link #evaluateRiskScoring(Object, BotbyeUserInfo, String, BotbyeEventStatus, String, Map)}. */
+    public CompletableFuture<BotbyeEvaluateResponse> evaluateRiskScoringAsync(
+            R request,
+            BotbyeUserInfo user,
+            String eventType,
+            BotbyeEventStatus eventStatus,
+            String botbyeResult,
+            Map<String, String> customFields
+    ) {
+        return evaluateAsync(riskScoringEvent(request, user, eventType, eventStatus, botbyeResult, customFields));
     }
 
     /** Combined Level 1+2 evaluation from a raw framework request (requires {@link #withExtractor}). */
@@ -203,9 +230,58 @@ public class Botbye<R> implements BotbyeEvaluator, Closeable {
             String token,
             Map<String, String> customFields
     ) {
+        return evaluate(fullEvent(request, user, eventType, eventStatus, token, customFields));
+    }
+
+    /** Asynchronous variant of {@link #evaluateFull(Object, BotbyeUserInfo, String, BotbyeEventStatus)}. */
+    public CompletableFuture<BotbyeEvaluateResponse> evaluateFullAsync(R request, BotbyeUserInfo user, String eventType, BotbyeEventStatus eventStatus) {
+        return evaluateFullAsync(request, user, eventType, eventStatus, null, null);
+    }
+
+    /** Asynchronous variant of {@link #evaluateFull(Object, BotbyeUserInfo, String, BotbyeEventStatus, String, Map)}. */
+    public CompletableFuture<BotbyeEvaluateResponse> evaluateFullAsync(
+            R request,
+            BotbyeUserInfo user,
+            String eventType,
+            BotbyeEventStatus eventStatus,
+            String token,
+            Map<String, String> customFields
+    ) {
+        return evaluateAsync(fullEvent(request, user, eventType, eventStatus, token, customFields));
+    }
+
+    private BotbyeValidationEvent validationEvent(R request, String token, Map<String, String> customFields) {
         BotbyeRequestInfo info = withToken(requireExtractor().extract(request), token);
 
-        return evaluate(new BotbyeFullEvent(info, new BotbyeEventInfo(eventType, eventStatus), user, orEmpty(customFields)));
+        return new BotbyeValidationEvent(info, orEmpty(customFields));
+    }
+
+    private BotbyeRiskScoringEvent riskScoringEvent(
+            R request,
+            BotbyeUserInfo user,
+            String eventType,
+            BotbyeEventStatus eventStatus,
+            String botbyeResult,
+            Map<String, String> customFields
+    ) {
+        // Level 2 carries no token / URL context — build the canonical risk shape from ip + headers,
+        // same as BotbyeRiskScoringEvent.of(...), regardless of what the shared extractor pulled out.
+        BotbyeRequestInfo info = requireExtractor().extract(request);
+
+        return BotbyeRiskScoringEvent.of(info.getIp(), info.getHeaders(), user, eventType, eventStatus, botbyeResult, orEmpty(customFields));
+    }
+
+    private BotbyeFullEvent fullEvent(
+            R request,
+            BotbyeUserInfo user,
+            String eventType,
+            BotbyeEventStatus eventStatus,
+            String token,
+            Map<String, String> customFields
+    ) {
+        BotbyeRequestInfo info = withToken(requireExtractor().extract(request), token);
+
+        return new BotbyeFullEvent(info, new BotbyeEventInfo(eventType, eventStatus), user, orEmpty(customFields));
     }
 
     /** Releases the underlying transport only if this client created it (a passed-in client is left alone). */

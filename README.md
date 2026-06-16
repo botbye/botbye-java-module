@@ -205,6 +205,14 @@ future.thenAccept(response -> {
 });
 ```
 
+The raw-request convenience methods (see [Request Extractors](#request-extractors-framework-integration))
+have async variants too — `evaluateValidationAsync`, `evaluateRiskScoringAsync`, and
+`evaluateFullAsync` — with the same signatures as their synchronous counterparts:
+
+```java
+CompletableFuture<BotbyeEvaluateResponse> future = botbye.evaluateValidationAsync(request);
+```
+
 ### 5. Phishing Image Tracking
 
 The phishing tracking pixel is embedded on a protected site; when a phishing clone copies the
@@ -368,8 +376,7 @@ BotbyeEvaluateResponse l2 = botbye.evaluateRiskScoring(
     new BotbyeUserInfo(userId),
     "LOGIN",
     BotbyeEventStatus.SUCCESSFUL,
-    null,                       // token override (null = use extractor's)
-    l1.getBotbyeResult(),
+    l1.getBotbyeResult(),       // botbyeResult — links to the Level 1 result
     Collections.emptyMap()
 );
 
@@ -377,7 +384,24 @@ BotbyeEvaluateResponse l2 = botbye.evaluateRiskScoring(
 BotbyeEvaluateResponse full = botbye.evaluateFull(request, new BotbyeUserInfo(userId), "LOGIN", BotbyeEventStatus.FAILED);
 ```
 
-An explicit `token` argument overrides the one returned by the extractor.
+For `evaluateValidation` and `evaluateFull`, an explicit `token` argument overrides the one returned
+by the extractor. `evaluateRiskScoring` takes no token — Level 2 links to Level 1 via `botbyeResult`;
+a token together with user/event context is a combined call, so use `evaluateFull` instead.
+
+Each of these has a non-blocking `*Async` variant with an identical signature that returns a
+`CompletableFuture<BotbyeEvaluateResponse>`:
+
+```java
+// Level 1 — bot validation, non-blocking
+botbye.evaluateValidationAsync(request)
+    .thenAccept(response -> {
+        if (response.isBlocked()) { /* handle blocked request */ }
+    });
+
+// Level 2 and combined have async variants too:
+botbye.evaluateRiskScoringAsync(request, new BotbyeUserInfo(userId), "LOGIN", BotbyeEventStatus.SUCCESSFUL);
+botbye.evaluateFullAsync(request, new BotbyeUserInfo(userId), "LOGIN", BotbyeEventStatus.FAILED);
+```
 
 ### Spring Boot Filter
 
