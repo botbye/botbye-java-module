@@ -6,6 +6,8 @@ import com.botbye.common.ModuleInfo;
 import com.botbye.common.http.BotbyeHttpClient;
 import com.botbye.common.http.BotbyeHttpRequest;
 import com.botbye.common.http.BotbyeHttpResponse;
+import com.botbye.common.http.Headers;
+import com.botbye.common.http.HeadersSerializer;
 import com.botbye.common.http.OkHttpBotbyeClient;
 import com.botbye.protection.model.BotbyeEvaluateResponse;
 import com.botbye.protection.model.BotbyeEvent;
@@ -18,8 +20,9 @@ import com.botbye.protection.model.BotbyeUserInfo;
 import com.botbye.protection.model.BotbyeValidationEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import java.io.Closeable;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -44,7 +47,7 @@ import java.util.logging.Logger;
  * @param <R> framework request type for the raw-request {@code evaluate*} methods; irrelevant when
  *            no extractor is configured.
  */
-public class Botbye<R> implements BotbyeEvaluator {
+public class Botbye<R> implements BotbyeEvaluator, Closeable {
     private static final Logger LOGGER = Logger.getLogger(Botbye.class.getName());
 
     static {
@@ -52,20 +55,27 @@ public class Botbye<R> implements BotbyeEvaluator {
         LOGGER.addHandler(new ConsoleHandler());
     }
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private static final Map<String, String> MODULE_HEADERS = Map.of(
+            "Module-Name", ModuleInfo.NAME,
+            "Module-Version", ModuleInfo.VERSION);
+
+    private final ObjectMapper mapper = createMapper();
     private final BotbyeHttpClient client;
     private final BotbyeRequestExtractor<R> extractor;
+    private final boolean ownsClient;
 
-    private BotbyeConfig botbyeConfig;
-    private String evaluateBaseUrl;
+    // volatile so a concurrent setConf() publishes the new endpoint/key, and evaluate() reads a single
+    // consistent snapshot into a local (no torn endpoint-from-old / key-from-new).
+    private volatile BotbyeConfig botbyeConfig;
 
-    private Botbye(BotbyeConfig config, BotbyeHttpClient client, BotbyeRequestExtractor<R> extractor) {
+    private Botbye(BotbyeConfig config, BotbyeHttpClient client, BotbyeRequestExtractor<R> extractor, boolean ownsClient) {
         if (client == null) {
             throw new IllegalStateException("[BotBye] http client is not specified");
         }
 
         this.client = client;
         this.extractor = extractor;
+        this.ownsClient = ownsClient;
 
         applyConfig(config);
         initRequest();
@@ -73,22 +83,29 @@ public class Botbye<R> implements BotbyeEvaluator {
 
     /** Explicit-event client with the default OkHttp transport. */
     public Botbye(BotbyeConfig config) {
-        this(config, defaultClient(config), null);
+        this(config, defaultClient(config), null, true);
     }
 
-    /** Explicit-event client with a custom transport. */
+    /** Explicit-event client with a custom (caller-owned) transport. */
     public Botbye(BotbyeConfig config, BotbyeHttpClient client) {
-        this(config, client, null);
+        this(config, client, null, false);
     }
 
     /** Factory for framework SDKs: bind a request extractor and use the default OkHttp transport. */
     public static <R> Botbye<R> withExtractor(BotbyeConfig config, BotbyeRequestExtractor<R> extractor) {
-        return new Botbye<>(config, defaultClient(config), extractor);
+        return new Botbye<>(config, defaultClient(config), extractor, true);
     }
 
-    /** Factory for framework SDKs: bind a request extractor and a custom transport. */
+    /** Factory for framework SDKs: bind a request extractor and a custom (caller-owned) transport. */
     public static <R> Botbye<R> withExtractor(BotbyeConfig config, BotbyeRequestExtractor<R> extractor, BotbyeHttpClient client) {
-        return new Botbye<>(config, client, extractor);
+        return new Botbye<>(config, client, extractor, false);
+    }
+
+    private static ObjectMapper createMapper() {
+        SimpleModule module = new SimpleModule();
+        module.addSerializer(Headers.class, new HeadersSerializer());
+
+        return new ObjectMapper().registerModule(module);
     }
 
     private static BotbyeHttpClient defaultClient(BotbyeConfig config) {
@@ -195,13 +212,20 @@ public class Botbye<R> implements BotbyeEvaluator {
         return evaluate(new BotbyeFullEvent(info, new BotbyeEventInfo(eventType, eventStatus), user, orEmpty(customFields)));
     }
 
+    /** Releases the underlying transport only if this client created it (a passed-in client is left alone). */
+    @Override
+    public void close() {
+        if (ownsClient) {
+            client.close();
+        }
+    }
+
     private void applyConfig(BotbyeConfig config) {
         if (config == null) {
             throw new IllegalStateException("[BotBye] config is not specified");
         }
 
         this.botbyeConfig = config;
-        this.evaluateBaseUrl = config.getBotbyeEndpoint() + "/api/v1/protect/evaluate";
     }
 
     private BotbyeRequestExtractor<R> requireExtractor() {
@@ -213,10 +237,11 @@ public class Botbye<R> implements BotbyeEvaluator {
     }
 
     private BotbyeHttpRequest buildEvaluateRequest(BotbyeEvent event) throws com.fasterxml.jackson.core.JsonProcessingException {
-        String url = evaluateBaseUrl + (event.getUrlToken() != null ? "?" + event.getUrlToken() : "");
-        ObjectWriter writer = mapper.writerFor(event.getClass()).withAttribute("server_key", botbyeConfig.getServerKey());
+        BotbyeConfig config = botbyeConfig;
+        String url = config.getBotbyeEndpoint() + "/api/v1/protect/evaluate" + (event.getUrlToken() != null ? "?" + event.getUrlToken() : "");
+        ObjectWriter writer = mapper.writerFor(event.getClass()).withAttribute("server_key", config.getServerKey());
 
-        return new BotbyeHttpRequest(url, "POST", moduleHeaders(), writer.writeValueAsBytes(event), botbyeConfig.getContentType());
+        return new BotbyeHttpRequest(url, "POST", MODULE_HEADERS, writer.writeValueAsBytes(event), config.getContentType());
     }
 
     private BotbyeEvaluateResponse handleEvaluateResponse(BotbyeHttpResponse response) {
@@ -237,12 +262,13 @@ public class Botbye<R> implements BotbyeEvaluator {
 
     private void initRequest() {
         try {
-            String url = botbyeConfig.getBotbyeEndpoint().replaceAll("/+$", "") + "/init-request/v1";
+            BotbyeConfig config = botbyeConfig;
+            String url = config.getBotbyeEndpoint().replaceAll("/+$", "") + "/init-request/v1";
 
             BotbyeHttpRequest request = new BotbyeHttpRequest(
-                    url, "POST", moduleHeaders(),
-                    mapper.writeValueAsBytes(new InitRequest(botbyeConfig.getServerKey())),
-                    botbyeConfig.getContentType());
+                    url, "POST", MODULE_HEADERS,
+                    mapper.writeValueAsBytes(new InitRequest(config.getServerKey())),
+                    config.getContentType());
 
             BotbyeHttpResponse response = client.call(request);
             if (response.getBody().length > 0) {
@@ -254,13 +280,6 @@ public class Botbye<R> implements BotbyeEvaluator {
         } catch (Exception e) {
             LOGGER.warning("[BotBye] exception occurred: " + e.getMessage());
         }
-    }
-
-    private Map<String, String> moduleHeaders() {
-        Map<String, String> headers = new HashMap<>();
-        headers.put("Module-Name", ModuleInfo.NAME);
-        headers.put("Module-Version", ModuleInfo.VERSION);
-        return headers;
     }
 
     private static BotbyeRequestInfo withToken(BotbyeRequestInfo base, String token) {

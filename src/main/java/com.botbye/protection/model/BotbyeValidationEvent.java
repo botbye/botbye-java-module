@@ -1,6 +1,7 @@
 package com.botbye.protection.model;
 
 import com.botbye.common.ModuleInfo;
+import com.botbye.common.http.Headers;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -35,7 +36,7 @@ public final class BotbyeValidationEvent implements BotbyeEvent, Serializable {
     public static BotbyeValidationEvent of(
             String ip,
             String token,
-            Map<String, String> headers,
+            Headers headers,
             String requestMethod,
             String requestUri,
             Map<String, String> customFields

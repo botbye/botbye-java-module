@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import okhttp3.Cache;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.MediaType;
@@ -86,6 +87,21 @@ public final class OkHttpBotbyeClient implements BotbyeHttpClient {
         });
 
         return future;
+    }
+
+    /** Shuts down the dispatcher's thread pool and evicts pooled connections so no threads leak. */
+    @Override
+    public void close() {
+        client.dispatcher().executorService().shutdown();
+        client.connectionPool().evictAll();
+        Cache cache = client.cache();
+        if (cache != null) {
+            try {
+                cache.close();
+            } catch (IOException ignored) {
+                // best-effort cleanup
+            }
+        }
     }
 
     private Request buildRequest(BotbyeHttpRequest request) {

@@ -7,6 +7,7 @@ import com.botbye.common.http.BotbyeHttpClient;
 import com.botbye.common.http.BotbyeHttpRequest;
 import com.botbye.common.http.BotbyeHttpResponse;
 import com.botbye.common.http.OkHttpBotbyeClient;
+import java.io.Closeable;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
@@ -37,7 +38,7 @@ import java.util.logging.Logger;
  *
  * @param <R> framework request type for the raw-request {@code fetchImage} methods.
  */
-public class BotbyePhishingClient<R> {
+public class BotbyePhishingClient<R> implements Closeable {
     private static final Logger LOGGER = Logger.getLogger(BotbyePhishingClient.class.getName());
 
     static {
@@ -45,11 +46,17 @@ public class BotbyePhishingClient<R> {
         LOGGER.addHandler(new ConsoleHandler());
     }
 
-    private BotbyePhishingConfig config;
+    private static final Map<String, String> MODULE_HEADERS = Map.of(
+            "Module-Name", ModuleInfo.NAME,
+            "Module-Version", ModuleInfo.VERSION);
+
+    // volatile so a concurrent setConf() publishes the new config to other threads.
+    private volatile BotbyePhishingConfig config;
     private final BotbyeHttpClient client;
     private final BotbyePhishingRequestExtractor<R> extractor;
+    private final boolean ownsClient;
 
-    private BotbyePhishingClient(BotbyePhishingConfig config, BotbyeHttpClient client, BotbyePhishingRequestExtractor<R> extractor) {
+    private BotbyePhishingClient(BotbyePhishingConfig config, BotbyeHttpClient client, BotbyePhishingRequestExtractor<R> extractor, boolean ownsClient) {
         if (config == null) {
             throw new IllegalStateException("[BotBye] phishing config is not specified");
         }
@@ -60,26 +67,27 @@ public class BotbyePhishingClient<R> {
         this.config = config;
         this.client = client;
         this.extractor = extractor;
+        this.ownsClient = ownsClient;
 
         initRequest();
     }
 
     public BotbyePhishingClient(BotbyePhishingConfig config) {
-        this(config, OkHttpBotbyeClient.forPhishing(), null);
+        this(config, OkHttpBotbyeClient.forPhishing(), null, true);
     }
 
     public BotbyePhishingClient(BotbyePhishingConfig config, BotbyeHttpClient client) {
-        this(config, client, null);
+        this(config, client, null, false);
     }
 
     /** Factory for framework SDKs: bind an Origin extractor and use the default OkHttp transport. */
     public static <R> BotbyePhishingClient<R> withExtractor(BotbyePhishingConfig config, BotbyePhishingRequestExtractor<R> extractor) {
-        return new BotbyePhishingClient<>(config, OkHttpBotbyeClient.forPhishing(), extractor);
+        return new BotbyePhishingClient<>(config, OkHttpBotbyeClient.forPhishing(), extractor, true);
     }
 
-    /** Factory for framework SDKs: bind an Origin extractor and a custom transport. */
+    /** Factory for framework SDKs: bind an Origin extractor and a custom (caller-owned) transport. */
     public static <R> BotbyePhishingClient<R> withExtractor(BotbyePhishingConfig config, BotbyePhishingRequestExtractor<R> extractor, BotbyeHttpClient client) {
-        return new BotbyePhishingClient<>(config, client, extractor);
+        return new BotbyePhishingClient<>(config, client, extractor, false);
     }
 
     public void setConf(BotbyePhishingConfig config) {
@@ -88,6 +96,14 @@ public class BotbyePhishingClient<R> {
         }
 
         this.config = config;
+    }
+
+    /** Releases the underlying transport only if this client created it (a passed-in client is left alone). */
+    @Override
+    public void close() {
+        if (ownsClient) {
+            client.close();
+        }
     }
 
     /** Fetch the tracking pixel using an explicit {@code Origin} header value. */
@@ -105,7 +121,7 @@ public class BotbyePhishingClient<R> {
     public BotbyePhishingResponse fetchImage(String origin, Map<String, String> query) {
         String url = buildImageUrl(config, query);
 
-        Map<String, String> headers = moduleHeaders();
+        Map<String, String> headers = new HashMap<>(MODULE_HEADERS);
         headers.put("Origin", origin != null ? origin : "origin is missing");
 
         try {
@@ -162,22 +178,16 @@ public class BotbyePhishingClient<R> {
      */
     private void initRequest() {
         try {
-            String url = config.getEndpoint().replaceAll("/+$", "")
-                    + "/api/v1/phishing/init-request/v1/" + config.getClientKey();
+            BotbyePhishingConfig conf = config;
+            String url = conf.getEndpoint().replaceAll("/+$", "")
+                    + "/api/v1/phishing/init-request/v1/" + conf.getClientKey();
 
-            BotbyeHttpResponse response = client.call(new BotbyeHttpRequest(url, "POST", moduleHeaders(), new byte[0], null));
+            BotbyeHttpResponse response = client.call(new BotbyeHttpRequest(url, "POST", MODULE_HEADERS, new byte[0], null));
             if (response.getStatus() < 200 || response.getStatus() >= 300) {
                 LOGGER.warning("[BotBye] phishing init-request returned HTTP " + response.getStatus());
             }
         } catch (Exception e) {
             LOGGER.warning("[BotBye] phishing init-request exception: " + e.getMessage());
         }
-    }
-
-    private Map<String, String> moduleHeaders() {
-        Map<String, String> headers = new HashMap<>();
-        headers.put("Module-Name", ModuleInfo.NAME);
-        headers.put("Module-Version", ModuleInfo.VERSION);
-        return headers;
     }
 }

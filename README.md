@@ -66,10 +66,25 @@ Botbye botbye = new Botbye(config);
 
 Validate device tokens where user identity is not yet available — at the proxy layer or in a middleware before authentication.
 
+Headers are passed as a `com.botbye.common.http.Headers` wrapping your framework's **multi-value** headers (`Map<String, List<String>>`). The SDK owns the normalization (lowercased keys, comma-joined values) at serialization time, so you never flatten them yourself:
+
+```java
+import com.botbye.common.http.Headers;
+
+// Build a Headers from your servlet request once, reuse everywhere.
+Headers headersOf(HttpServletRequest request) {
+    Map<String, List<String>> map = new HashMap<>();
+    for (String name : Collections.list(request.getHeaderNames())) {
+        map.put(name, Collections.list(request.getHeaders(name)));
+    }
+    return new Headers(map);
+}
+```
+
 ```java
 import com.botbye.protection.model.BotbyeValidationEvent;
 
-Map<String, String> headers = flattenHeaders(request);
+Headers headers = headersOf(request);
 
 BotbyeEvaluateResponse response = botbye.evaluate(BotbyeValidationEvent.of(
     request.getRemoteAddr(),
@@ -319,16 +334,19 @@ framework request type:
 ```java
 import com.botbye.protection.Botbye;
 import com.botbye.protection.model.BotbyeRequestInfo;
+import com.botbye.common.http.Headers;
 import jakarta.servlet.http.HttpServletRequest;
 
 Botbye<HttpServletRequest> botbye = Botbye.withExtractor(config, request -> {
-    Map<String, String> headers = Collections.list(request.getHeaderNames()).stream()
-        .collect(Collectors.toMap(h -> h, request::getHeader));
+    Map<String, List<String>> map = new HashMap<>();
+    for (String name : Collections.list(request.getHeaderNames())) {
+        map.put(name, Collections.list(request.getHeaders(name)));
+    }
 
     return new BotbyeRequestInfo(
         request.getRemoteAddr(),
         request.getParameter("botbye_token"),
-        headers,
+        new Headers(map),
         request.getMethod(),
         request.getRequestURI()
     );
@@ -407,6 +425,18 @@ class MyHttpClient implements BotbyeHttpClient {
 
 Botbye botbye = new Botbye(config, new MyHttpClient());
 ```
+
+## Lifecycle
+
+Construct the client **once** and reuse it for the lifetime of your application — it owns a connection
+pool and a dispatcher thread pool. Both `Botbye` and `BotbyePhishingClient` implement `Closeable`:
+
+```java
+botbye.close(); // shuts down the default OkHttp transport (dispatcher + connection pool)
+```
+
+`close()` only shuts down the transport the SDK created for you. If you passed your own
+`BotbyeHttpClient`, the SDK never closes it — you own its lifecycle.
 
 ## Helpers
 

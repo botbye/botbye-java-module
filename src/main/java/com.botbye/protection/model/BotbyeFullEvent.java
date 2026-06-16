@@ -1,6 +1,7 @@
 package com.botbye.protection.model;
 
 import com.botbye.common.ModuleInfo;
+import com.botbye.common.http.Headers;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -45,7 +46,7 @@ public final class BotbyeFullEvent implements BotbyeEvent, Serializable {
     public static BotbyeFullEvent of(
             String ip,
             String token,
-            Map<String, String> headers,
+            Headers headers,
             BotbyeUserInfo user,
             String eventType,
             BotbyeEventStatus eventStatus
@@ -56,7 +57,7 @@ public final class BotbyeFullEvent implements BotbyeEvent, Serializable {
     public static BotbyeFullEvent of(
             String ip,
             String token,
-            Map<String, String> headers,
+            Headers headers,
             BotbyeUserInfo user,
             String eventType,
             BotbyeEventStatus eventStatus,
