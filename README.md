@@ -215,11 +215,12 @@ BotbyePhishingClient phishing = new BotbyePhishingClient(
         .build()
 );
 
-// Default PNG pixel
-BotbyePhishingResponse res = phishing.fetchImage(request.getHeader("Origin"));
+// Proxy the browser's pixel request: forward its original query verbatim (it carries
+// format / image_id and the JS tag's module_name / module_version).
+Map<String, String> query = request.getParameterMap().entrySet().stream()
+    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue()[0]));
 
-// SVG variant — pass an imageId
-BotbyePhishingResponse svg = phishing.fetchImage(request.getHeader("Origin"), "hero-banner");
+BotbyePhishingResponse res = phishing.fetchImage(request.getHeader("Origin"), query);
 
 res.getStatus();   // 200
 res.getHeaders();  // {Content-Type=image/png, ...}
@@ -233,7 +234,7 @@ res.getError();    // BotbyeError — non-null on transport failure
 |---|---|---|
 | `status` | `int` | Upstream HTTP status (`0` on transport failure) |
 | `headers` | `Map<String, String>` | Response headers (e.g. `Content-Type`) |
-| `body` | `byte[]` | Raw image bytes (PNG, or SVG when `imageId` is set) |
+| `body` | `byte[]` | Raw image bytes (PNG or SVG, per the forwarded `format` query param) |
 | `error` | `BotbyeError` | Normalized transport error: `timeout`, `connection error`, or `invalid json response` |
 
 ## Response
@@ -358,9 +359,7 @@ BotbyeEvaluateResponse l2 = botbye.evaluateRiskScoring(
 BotbyeEvaluateResponse full = botbye.evaluateFull(request, new BotbyeUserInfo(userId), "LOGIN", BotbyeEventStatus.FAILED);
 ```
 
-An explicit `token` argument overrides the one returned by the extractor. The
-`HeaderUtils.getIpFromHeaders(headers)` helper is handy inside extractors when the IP lives behind a
-proxy.
+An explicit `token` argument overrides the one returned by the extractor.
 
 ### Spring Boot Filter
 
@@ -413,7 +412,6 @@ Botbye botbye = new Botbye(config, new MyHttpClient());
 
 | Helper | Description |
 |---|---|
-| `HeaderUtils.getIpFromHeaders(headers)` | Extract the client IP from headers (`x-forwarded-for` first hop, then `x-real-ip`). |
 | `FallbackEvaluationResult.create(message)` | Build a fail-open `BotbyeEvaluateResponse` (`ALLOW` + `error`) for your own short-circuit paths. |
 | `BotbyeErrors` | Normalized error message constants: `SDK_ERROR`, `UNKNOWN_ERROR`, `TIMEOUT_ERROR`, `CONNECTION_ERROR`, `JSON_ERROR`. |
 

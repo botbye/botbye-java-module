@@ -90,14 +90,20 @@ public class BotbyePhishingClient<R> {
         this.config = config;
     }
 
-    /** Fetch the tracking pixel using an explicit {@code Origin} header value (PNG). */
+    /** Fetch the tracking pixel using an explicit {@code Origin} header value. */
     public BotbyePhishingResponse fetchImage(String origin) {
-        return fetchImage(origin, (String) null);
+        return fetchImage(origin, Collections.emptyMap());
     }
 
-    /** Fetch the tracking pixel using an explicit {@code Origin} header value. */
-    public BotbyePhishingResponse fetchImage(String origin, String imageId) {
-        String url = buildImageUrl(config, imageId);
+    /**
+     * Fetch the tracking pixel using an explicit {@code Origin} header value.
+     *
+     * <p>{@code query} is forwarded verbatim to the {@code /server} route — pass the browser's
+     * original pixel query (which carries {@code format}, {@code image_id}, and the JS tag's
+     * {@code module_name} / {@code module_version}).
+     */
+    public BotbyePhishingResponse fetchImage(String origin, Map<String, String> query) {
+        String url = buildImageUrl(config, query);
 
         Map<String, String> headers = moduleHeaders();
         headers.put("Origin", origin != null ? origin : "origin is missing");
@@ -114,27 +120,39 @@ public class BotbyePhishingClient<R> {
 
     /** Fetch the tracking pixel from a raw framework request (requires {@link #withExtractor}). */
     public BotbyePhishingResponse fetchImage(R request) {
-        return fetchImage(request, null);
+        return fetchImage(request, Collections.emptyMap());
     }
 
     /** Fetch the tracking pixel from a raw framework request (requires {@link #withExtractor}). */
-    public BotbyePhishingResponse fetchImage(R request, String imageId) {
+    public BotbyePhishingResponse fetchImage(R request, Map<String, String> query) {
         if (extractor == null) {
             throw new IllegalStateException(
                     "[BotBye] no phishing extractor configured; use BotbyePhishingClient.withExtractor(...) to fetch from a raw request");
         }
 
-        return fetchImage(extractor.extractOrigin(request), imageId);
+        return fetchImage(extractor.extractOrigin(request), query);
     }
 
-    private static String buildImageUrl(BotbyePhishingConfig conf, String imageId) {
+    private static String buildImageUrl(BotbyePhishingConfig conf, Map<String, String> query) {
         String baseUrl = conf.getEndpoint() + "/api/v1/phishing/image/" + conf.getClientKey() + "/server";
 
-        if (imageId == null || imageId.isBlank()) {
-            return baseUrl + "?format=png";
+        if (query == null || query.isEmpty()) {
+            return baseUrl;
         }
 
-        return baseUrl + "?image_id=" + URLEncoder.encode(imageId, StandardCharsets.UTF_8) + "&format=svg";
+        StringBuilder url = new StringBuilder(baseUrl).append('?');
+        boolean first = true;
+        for (Map.Entry<String, String> param : query.entrySet()) {
+            if (!first) {
+                url.append('&');
+            }
+            url.append(URLEncoder.encode(param.getKey(), StandardCharsets.UTF_8))
+                    .append('=')
+                    .append(URLEncoder.encode(param.getValue(), StandardCharsets.UTF_8));
+            first = false;
+        }
+
+        return url.toString();
     }
 
     /**

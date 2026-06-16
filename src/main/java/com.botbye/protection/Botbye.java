@@ -44,7 +44,7 @@ import java.util.logging.Logger;
  * @param <R> framework request type for the raw-request {@code evaluate*} methods; irrelevant when
  *            no extractor is configured.
  */
-public class Botbye<R> {
+public class Botbye<R> implements BotbyeEvaluator {
     private static final Logger LOGGER = Logger.getLogger(Botbye.class.getName());
 
     static {
@@ -108,11 +108,13 @@ public class Botbye<R> {
         );
     }
 
+    @Override
     public void setConf(BotbyeConfig config) {
         applyConfig(config);
     }
 
     /** Send a fully-built event for risk evaluation. Fails open: returns ALLOW + error on failure. */
+    @Override
     public BotbyeEvaluateResponse evaluate(BotbyeEvent event) {
         try {
             BotbyeHttpRequest request = buildEvaluateRequest(event);
@@ -124,6 +126,7 @@ public class Botbye<R> {
     }
 
     /** Asynchronous variant of {@link #evaluate(BotbyeEvent)}. */
+    @Override
     public CompletableFuture<BotbyeEvaluateResponse> evaluateAsync(BotbyeEvent event) {
         try {
             BotbyeHttpRequest request = buildEvaluateRequest(event);
@@ -235,11 +238,9 @@ public class Botbye<R> {
     private void initRequest() {
         try {
             String url = botbyeConfig.getBotbyeEndpoint().replaceAll("/+$", "") + "/init-request/v1";
-            Map<String, String> headers = moduleHeaders();
-            headers.put("X-Botbye-Server-Key", botbyeConfig.getServerKey());
 
             BotbyeHttpRequest request = new BotbyeHttpRequest(
-                    url, "POST", headers,
+                    url, "POST", moduleHeaders(),
                     mapper.writeValueAsBytes(new InitRequest(botbyeConfig.getServerKey())),
                     botbyeConfig.getContentType());
 
