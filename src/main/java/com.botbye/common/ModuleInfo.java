@@ -7,7 +7,7 @@ package com.botbye.common;
  */
 public final class ModuleInfo {
     public static final String NAME = "Java";
-    public static final String VERSION = "3.0.0";
+    public static final String VERSION = "3.0.1";
 
     private ModuleInfo() {
     }

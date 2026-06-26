@@ -117,7 +117,10 @@ public class BotbyePhishingClient<R> implements Closeable {
         String url = buildImageUrl(config, query);
 
         Map<String, String> headers = new HashMap<>(MODULE_HEADERS);
-        headers.put("Origin", origin != null ? origin : "origin is missing");
+        // Only forward Origin when the caller has a real value
+        if (!isMissingOrigin(origin)) {
+            headers.put("Origin", origin);
+        }
 
         try {
             BotbyeHttpResponse response = client.call(new BotbyeHttpRequest(url, "GET", headers, null, null));
@@ -142,6 +145,12 @@ public class BotbyePhishingClient<R> implements Closeable {
         }
 
         return fetchImage(extractor.extractOrigin(request), query);
+    }
+
+    // The Origin is unusable when absent, blank, or the literal "null" that browsers emit for opaque
+    // origins (and that a stringified null produces)
+    private static boolean isMissingOrigin(String origin) {
+        return origin == null || origin.isBlank() || origin.trim().equalsIgnoreCase("null");
     }
 
     private static String buildImageUrl(BotbyePhishingConfig conf, Map<String, String> query) {
