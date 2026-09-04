@@ -1,6 +1,7 @@
 package com.botbye.phishing;
 
 import com.botbye.common.BotbyeError;
+import com.botbye.common.BotbyeErrors;
 import com.botbye.common.ErrorClassifier;
 import com.botbye.common.ModuleInfo;
 import com.botbye.common.http.BotbyeHttpClient;
@@ -12,38 +13,45 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 /**
- * Phishing-only client. Authenticates with the public {@link BotbyePhishingConfig#getClientKey()}
- * embedded in the URL path — it needs no server key, so it can be constructed independently of the
- * evaluate {@code com.botbye.protection.Botbye} client.
+ * Phishing-only client, keyed by the public {@link BotbyePhishingConfig#getClientKey()} — no server key
+ * needed. {@link #fetchCatcher} proxies the asset via the {@code /server} route so the backend can
+ * attribute it even though the browser never reaches BotBye; construction fires a best-effort init
+ * handshake reporting this module via {@code Module-Name} / {@code Module-Version}.
  *
- * <p>On construction it fires a best-effort server-integration init handshake
- * ({@code POST /api/v1/phishing/init-request/v1/{clientKey}}), reporting this module via the
- * {@code Module-Name} / {@code Module-Version} headers. {@link #fetchImage} fetches the tracking
- * pixel server-side via the {@code /server} route, so the backend can attribute it to this module
- * even when the browser never reaches BotBye directly (the SDK proxies the image).
+ * <p>Construct it directly and pass {@code Origin} / {@code Referer} to {@link #fetchCatcher} yourself,
+ * or via {@link #withExtractor} and pass only the raw request to {@link #fetchCatcher}.
  *
- * <p>Two construction modes:
- * <ul>
- *   <li>{@code new BotbyePhishingClient(config)} — pass the {@code Origin} header to
- *       {@link #fetchImage(String)} yourself.</li>
- *   <li>{@link #withExtractor} — binds a {@link BotbyePhishingRequestExtractor} of framework request
- *       type {@code R} so callers pass only their raw request to {@link #fetchImage(Object)}.</li>
- * </ul>
- *
- * @param <R> framework request type for the raw-request {@code fetchImage} methods.
+ * @param <R> framework request type for the raw-request {@code fetchCatcher} methods.
  */
 public class BotbyePhishingClient<R> implements Closeable {
-    // A library must not install handlers or set levels on the JUL logger — that is the host
-    // application's responsibility (see the note in com.botbye.protection.Botbye).
+    // A library must not install handlers or set levels on the JUL logger — that is the host's job.
     private static final Logger LOGGER = Logger.getLogger(BotbyePhishingClient.class.getName());
 
     private static final Map<String, String> MODULE_HEADERS = Map.of(
             "Module-Name", ModuleInfo.NAME,
             "Module-Version", ModuleInfo.VERSION);
+
+    private static final String FORMAT_PARAM = "format";
+    private static final String IMAGE_ID_PARAM = "image_id";
+    private static final String EXECUTABLE_PARAM = "executable";
+    private static final String MODULE_NAME_PARAM = "module_name";
+    private static final String MODULE_VERSION_PARAM = "module_version";
+
+    // Whitelist, not blacklist: the endpoint is public, so a control param the route adds later must not
+    // become forwardable by default.
+    private static final Set<String> FORWARDABLE_PARAMS = Set.of(MODULE_NAME_PARAM, MODULE_VERSION_PARAM);
+
+    private static int errorStatus(String message) {
+        return BotbyeErrors.TIMEOUT_ERROR.equals(message) ? 504 : 502;
+    }
 
     // volatile so a concurrent setConf() publishes the new config to other threads.
     private volatile BotbyePhishingConfig config;
@@ -75,12 +83,12 @@ public class BotbyePhishingClient<R> implements Closeable {
         this(config, client, null, false);
     }
 
-    /** Factory for framework SDKs: bind an Origin extractor and use the default OkHttp transport. */
+    /** Framework SDKs: bind a request-info extractor, default OkHttp transport. */
     public static <R> BotbyePhishingClient<R> withExtractor(BotbyePhishingConfig config, BotbyePhishingRequestExtractor<R> extractor) {
         return new BotbyePhishingClient<>(config, OkHttpBotbyeClient.forPhishing(), extractor, true);
     }
 
-    /** Factory for framework SDKs: bind an Origin extractor and a custom (caller-owned) transport. */
+    /** Framework SDKs: bind a request-info extractor and your own transport. */
     public static <R> BotbyePhishingClient<R> withExtractor(BotbyePhishingConfig config, BotbyePhishingRequestExtractor<R> extractor, BotbyeHttpClient client) {
         return new BotbyePhishingClient<>(config, client, extractor, false);
     }
@@ -93,7 +101,7 @@ public class BotbyePhishingClient<R> implements Closeable {
         this.config = config;
     }
 
-    /** Releases the underlying transport only if this client created it (a passed-in client is left alone). */
+    /** Releases the transport only if this client created it. */
     @Override
     public void close() {
         if (ownsClient) {
@@ -101,56 +109,139 @@ public class BotbyePhishingClient<R> implements Closeable {
         }
     }
 
-    /** Fetch the tracking pixel using an explicit {@code Origin} header value. */
-    public BotbyePhishingResponse fetchImage(String origin) {
-        return fetchImage(origin, Collections.emptyMap());
+    /**
+     * Fetch the catcher asset: {@link BotbyePhishingCatcher#png()} is the 1×1 pixel,
+     * {@link BotbyePhishingCatcher#svg(String)} the wrapper that makes the browser fetch it.
+     *
+     * @param catcher which asset, and its parameters — the SVG one cannot be built without its
+     *     {@code innerPngUrl}.
+     * @param referer pass next to {@code origin}: an {@code <object data="…svg">} pixel sends no
+     *     {@code Origin}.
+     */
+    public BotbyePhishingResponse fetchCatcher(BotbyePhishingCatcher catcher, String origin, String referer) {
+        return fetchCatcherAsset(catcher, new BotbyePhishingRequestInfo(origin, referer));
     }
 
     /**
-     * Fetch the tracking pixel using an explicit {@code Origin} header value.
-     *
-     * <p>{@code query} is forwarded verbatim to the {@code /server} route — pass the browser's
-     * original pixel query (which carries {@code format}, {@code image_id}, and the JS tag's
-     * {@code module_name} / {@code module_version}).
+     * {@link #fetchCatcher} from a raw framework request (requires {@link #withExtractor}): the
+     * extractor is the only thing that touches the request, headers and query alike.
      */
-    public BotbyePhishingResponse fetchImage(String origin, Map<String, String> query) {
-        String url = buildImageUrl(config, query);
+    public BotbyePhishingResponse fetchCatcher(R request, BotbyePhishingCatcher catcher) {
+        return fetchCatcherAsset(catcher, extractRequestInfo(request));
+    }
 
-        Map<String, String> headers = new HashMap<>(MODULE_HEADERS);
-        // Only forward Origin when the caller has a real value
-        if (!isMissingOrigin(origin)) {
-            headers.put("Origin", origin);
+    private BotbyePhishingResponse fetchCatcherAsset(BotbyePhishingCatcher catcher, BotbyePhishingRequestInfo info) {
+        Map<String, String> catcherQuery = forwardable(info.getQuery());
+        catcherQuery.put(FORMAT_PARAM, catcher.getFormat());
+
+        if (catcher.isSvg()) {
+            catcherQuery.put(IMAGE_ID_PARAM, catcher.getInnerPngUrl().trim());
+            catcherQuery.put(EXECUTABLE_PARAM, Boolean.toString(!catcher.isSkipExecution()));
         }
 
+        return fetchAsset(info.getOrigin(), info.getReferer(), catcherQuery);
+    }
+
+    private BotbyePhishingResponse fetchAsset(String origin, String referer, Map<String, String> query) {
+        // URL assembly inside the try: a surprise there is an error response, not a throw.
         try {
+            String url = buildImageUrl(config, query);
+
+            Map<String, String> headers = new HashMap<>(MODULE_HEADERS);
+            String usableOrigin = usableHeaderValue(origin);
+            if (usableOrigin != null) {
+                headers.put("Origin", usableOrigin);
+            }
+
+            String usableReferer = usableHeaderValue(referer);
+            if (usableReferer != null) {
+                headers.put("Referer", usableReferer);
+            }
+
             BotbyeHttpResponse response = client.call(new BotbyeHttpRequest(url, "GET", headers, null, null));
 
             return new BotbyePhishingResponse(response.getStatus(), response.getHeaders(), response.getBody());
         } catch (Exception e) {
             LOGGER.warning("[BotBye] phishing image exception occurred: " + e.getMessage());
-            return new BotbyePhishingResponse(0, Collections.emptyMap(), new byte[0], new BotbyeError(ErrorClassifier.classify(e)));
+
+            String message = ErrorClassifier.classify(e);
+
+            return new BotbyePhishingResponse(
+                    errorStatus(message), Collections.emptyMap(), new byte[0], new BotbyeError(message));
         }
     }
 
-    /** Fetch the tracking pixel from a raw framework request (requires {@link #withExtractor}). */
-    public BotbyePhishingResponse fetchImage(R request) {
-        return fetchImage(request, Collections.emptyMap());
+    // A null result degrades to "no headers" rather than NPE-ing in the customer's handler.
+    private BotbyePhishingRequestInfo extractRequestInfo(R request) {
+        BotbyePhishingRequestInfo info = requireExtractor().extract(request);
+
+        return info == null ? new BotbyePhishingRequestInfo(null, null) : info;
     }
 
-    /** Fetch the tracking pixel from a raw framework request (requires {@link #withExtractor}). */
-    public BotbyePhishingResponse fetchImage(R request, Map<String, String> query) {
+    private BotbyePhishingRequestExtractor<R> requireExtractor() {
         if (extractor == null) {
             throw new IllegalStateException(
                     "[BotBye] no phishing extractor configured; use BotbyePhishingClient.withExtractor(...) to fetch from a raw request");
         }
 
-        return fetchImage(extractor.extractOrigin(request), query);
+        return extractor;
     }
 
-    // The Origin is unusable when absent, blank, or the literal "null" that browsers emit for opaque
-    // origins (and that a stringified null produces)
-    private static boolean isMissingOrigin(String origin) {
-        return origin == null || origin.isBlank() || origin.trim().equalsIgnoreCase("null");
+    // Keeps only the attribution params, so a forwarded query can never carry a control param. The value
+    // is a list because a param can arrive more than once; one value per key goes on the wire.
+    private static Map<String, String> forwardable(Map<String, List<String>> query) {
+        if (query == null) {
+            return new LinkedHashMap<>();
+        }
+
+        return query.entrySet().stream()
+                .filter(param -> FORWARDABLE_PARAMS.contains(param.getKey()) && firstValue(param.getValue()) != null)
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        param -> firstValue(param.getValue()),
+                        (first, second) -> first,
+                        LinkedHashMap::new));
+    }
+
+    private static String firstValue(List<String> values) {
+        return values == null || values.isEmpty() ? null : values.get(0);
+    }
+
+    // Unusable when absent, blank, or the literal "null" browsers emit for opaque origins.
+    private static boolean isMissingValue(String value) {
+        return value == null || value.isBlank() || value.trim().equalsIgnoreCase("null");
+    }
+
+    private static String usableHeaderValue(String value) {
+        if (isMissingValue(value)) {
+            return null;
+        }
+
+        String trimmed = value.trim();
+        boolean needsEncoding = false;
+        for (int i = 0; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+            if (c >= 0x7f || (c <= 0x1f && c != '\t')) {
+                needsEncoding = true;
+                break;
+            }
+        }
+
+        if (!needsEncoding) {
+            return trimmed;
+        }
+
+        StringBuilder encoded = new StringBuilder(trimmed.length());
+        for (byte b : trimmed.getBytes(StandardCharsets.UTF_8)) {
+            int code = b & 0xFF;
+            if (code >= 0x7F || (code <= 0x1F && code != '\t')) {
+                encoded.append('%').append(String.format("%02X", code));
+            } else {
+                encoded.append((char) code);
+            }
+        }
+
+        return encoded.toString();
     }
 
     private static String buildImageUrl(BotbyePhishingConfig conf, Map<String, String> query) {
@@ -163,12 +254,17 @@ public class BotbyePhishingClient<R> implements Closeable {
         StringBuilder url = new StringBuilder(baseUrl).append('?');
         boolean first = true;
         for (Map.Entry<String, String> param : query.entrySet()) {
+            if (param.getKey() == null) {
+                continue;
+            }
             if (!first) {
                 url.append('&');
             }
+            // A null value is a valueless param, not a reason to fail the fetch.
+            String value = param.getValue() == null ? "" : param.getValue();
             url.append(URLEncoder.encode(param.getKey(), StandardCharsets.UTF_8))
                     .append('=')
-                    .append(URLEncoder.encode(param.getValue(), StandardCharsets.UTF_8));
+                    .append(URLEncoder.encode(value, StandardCharsets.UTF_8));
             first = false;
         }
 
@@ -176,9 +272,7 @@ public class BotbyePhishingClient<R> implements Closeable {
     }
 
     /**
-     * Reports the server-side phishing integration to the backend (the {@code SERVER_INTEGRATION_INIT}
-     * get-started milestone). Best-effort: any failure is logged and swallowed, mirroring the evaluate
-     * client's init handshake, so it never blocks or breaks the customer's startup.
+     * Reports the server-side phishing integration to the backend. Best-effort: never blocks startup.
      */
     private void initRequest() {
         try {

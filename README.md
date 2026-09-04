@@ -14,13 +14,13 @@ BotBye goes beyond fixed bot/ATO checks. Risk dimensions and metrics are fully d
 ### Gradle (Kotlin DSL)
 
 ```kotlin
-implementation("com.botbye:java-module:3.0.1")
+implementation("com.botbye:java-module:4.0.0")
 ```
 
 ### Gradle (Groovy DSL)
 
 ```groovy
-implementation 'com.botbye:java-module:3.0.1'
+implementation 'com.botbye:java-module:4.0.0'
 ```
 
 ### Maven
@@ -29,7 +29,7 @@ implementation 'com.botbye:java-module:3.0.1'
 <dependency>
     <groupId>com.botbye</groupId>
     <artifactId>java-module</artifactId>
-    <version>3.0.1</version>
+    <version>4.0.0</version>
 </dependency>
 ```
 
@@ -216,48 +216,86 @@ CompletableFuture<BotbyeEvaluateResponse> future = botbye.evaluateValidationAsyn
 ### 5. Phishing Image Tracking
 
 The phishing tracking pixel is embedded on a protected site; when a phishing clone copies the
-markup, the pixel is requested with the clone's `Origin`, which lets BotBye record a phishing
-candidate.
+markup, the pixel is requested with the clone's `Origin` — or, where the pixel is embedded as
+`<object data="…svg">` and no `Origin` is sent at all, with its `Referer`. Either header names the
+page, which is what lets BotBye record a phishing candidate.
 
 Phishing lives in its own dedicated `BotbyePhishingClient` — **separate from the evaluate `Botbye`
 client**. The project is identified by a public, browser-safe `clientKey` in the URL path, so the
 client needs **no server key**; you can construct it standalone. On construction it fires a
 best-effort server-integration init handshake (`POST /api/v1/phishing/init-request/v1/{clientKey}`)
-reporting this module, and `fetchImage` proxies the pixel via the server `/server` route so the
-backend can attribute it to this module even when the browser never reaches BotBye directly.
+reporting this module, and `fetchCatcher` proxies the asset via the server `/server` route so
+the backend can attribute it to this module even when the browser never reaches BotBye directly.
 
 ```java
+import com.botbye.phishing.BotbyePhishingCatcher;
 import com.botbye.phishing.BotbyePhishingClient;
 import com.botbye.phishing.BotbyePhishingConfig;
 import com.botbye.phishing.BotbyePhishingResponse;
 
-BotbyePhishingClient phishing = new BotbyePhishingClient(
+// <Void> — a standalone client binds no extractor, so there is no request type.
+BotbyePhishingClient<Void> phishing = new BotbyePhishingClient<>(
     new BotbyePhishingConfig.Builder()
         .endpoint("https://verify.botbye.com") // default
         .clientKey("<public-client-key>")
         .build()
 );
 
-// Proxy the browser's pixel request: forward its original query verbatim (it carries
-// format / image_id and the JS tag's module_name / module_version).
-Map<String, String> query = request.getParameterMap().entrySet().stream()
-    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue()[0]));
+// One method; the catcher you pass picks the asset. Pass Referer next to Origin — an SVG pixel embedded
+// as <object data="…svg"> sends no Origin, so Referer is the only header naming the page.
+BotbyePhishingResponse res = phishing.fetchCatcher(
+    BotbyePhishingCatcher.png(), request.getHeader("Origin"), request.getHeader("Referer"));
 
-BotbyePhishingResponse res = phishing.fetchImage(request.getHeader("Origin"), query);
+// The SVG names the URL it embeds as the nested pixel (point it at your own PNG endpoint so that fetch
+// proxies through your origin too — BotBye honours it only as an absolute http(s) URL). It is an
+// argument of svg(), not an optional parameter, so an SVG without one does not compile.
+BotbyePhishingResponse svg = phishing.fetchCatcher(
+    // svg(url, false) opts into the script-carrying variant; svg(url) is script-less, no JS on the page.
+    BotbyePhishingCatcher.svg("https://your-site.example/example.png"),
+    request.getHeader("Origin"),
+    request.getHeader("Referer"));
 
 res.getStatus();   // 200
-res.getHeaders();  // {Content-Type=image/png, ...}
+res.getHeaders();  // {Content-Type=image/png, ...} — image/svg+xml for the SVG response
 res.getBody();     // byte[] — raw image bytes to relay back to the browser
 res.getError();    // BotbyeError — non-null on transport failure
 ```
 
-`fetchImage` returns `BotbyePhishingResponse`:
+`format`, `image_id` and `executable` are set by the call and never read off the request: the endpoint
+you expose is public, so a query on it must not be able to redirect the nested pixel fetch or pick the
+SVG variant behind your back. Only `module_name` and `module_version` pass through, and only via the
+extractor below. `executable` is always sent, never omitted, so the variant never rides on the backend's
+default for a missing param.
+
+Like the evaluate client, the phishing client supports a request extractor, so a framework SDK maps a
+raw request to a `BotbyePhishingRequestInfo` once and callers pass only their request object. The
+extractor is the single place that reads the request — headers and query alike:
+
+```java
+import com.botbye.phishing.BotbyePhishingRequestInfo;
+
+BotbyePhishingClient<HttpServletRequest> phishing = BotbyePhishingClient.withExtractor(
+    new BotbyePhishingConfig.Builder().clientKey("<public-client-key>").build(),
+    req -> new BotbyePhishingRequestInfo(
+        req.getHeader("Origin"),
+        req.getHeader("Referer"),
+        req.getParameterMap().entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, e -> List.of(e.getValue())))));
+
+// An overload of fetchCatcher: the manual one takes three arguments, this one two, so a call cannot
+// bind to the wrong method.
+BotbyePhishingResponse res = phishing.fetchCatcher(request, BotbyePhishingCatcher.png());
+BotbyePhishingResponse svg = phishing.fetchCatcher(
+    request, BotbyePhishingCatcher.svg("https://your-site.example/example.png"));
+```
+
+`fetchCatcher` returns `BotbyePhishingResponse`:
 
 | Field | Type | Description |
 |---|---|---|
-| `status` | `int` | Upstream HTTP status (`0` on transport failure) |
+| `status` | `int` | Upstream HTTP status. A transport failure has none, so it reports the gateway status it means: `504` for a timeout, `502` for anything else |
 | `headers` | `Map<String, String>` | Response headers (e.g. `Content-Type`) |
-| `body` | `byte[]` | Raw image bytes (PNG or SVG, per the forwarded `format` query param) |
+| `body` | `byte[]` | Raw image bytes (PNG or SVG, per the catcher you passed) |
 | `error` | `BotbyeError` | Normalized transport error: `timeout`, `connection error`, or `invalid json response` |
 
 ## Response
