@@ -1,12 +1,16 @@
 package com.botbye.phishing;
 
 /**
- * Extracts the {@code Origin} header value from a framework-specific request object. A framework SDK
- * describes this once via {@link BotbyePhishingClient#withExtractor}; consumers then pass only their
- * raw request to {@link BotbyePhishingClient#fetchImage}. Return {@code null} when no {@code Origin}
- * is present.
+ * Maps a framework-specific request object (e.g. {@code HttpServletRequest}, a Ktor/Spring request) to a
+ * {@link BotbyePhishingRequestInfo}. A framework SDK describes this once via
+ * {@link BotbyePhishingClient#withExtractor}; consumers then pass only their raw request to
+ * {@link BotbyePhishingClient#fetchCatcher}.
+ *
+ * <p>Return a {@link BotbyePhishingRequestInfo} even when the request carries neither header — its
+ * {@code origin} and {@code referer} are each allowed to be {@code null}. Returning {@code null}
+ * outright is tolerated (treated as "no headers to forward") but not the intended contract.
  */
 @FunctionalInterface
 public interface BotbyePhishingRequestExtractor<R> {
-    String extractOrigin(R request);
+    BotbyePhishingRequestInfo extract(R request);
 }
